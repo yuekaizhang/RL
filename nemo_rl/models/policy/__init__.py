@@ -456,14 +456,45 @@ class DraftConfigDisabled(TypedDict):
     enabled: Literal[False]
 
 
+class DSparkDraftOptions(TypedDict):
+    """Training options for DSpark draft co-training (DTensor-v2 backend only).
+
+    Architecture fields (block_size, target_layer_ids, mask_token_id, markov and
+    confidence head layout) are read from the draft checkpoint's config.json and
+    are intentionally not configurable here.
+    """
+
+    # Anchor blocks sampled per sequence each training forward (capped by the
+    # number of valid response positions).
+    num_anchors: int
+    # Cross-entropy weight against the rollout tokens.
+    ce_loss_alpha: float
+    # Total-variation distillation weight against the policy's raw logits.
+    l1_loss_alpha: float
+    # Confidence-head BCE weight; requires the checkpoint's confidence head.
+    confidence_loss_alpha: float
+    # Exponential per-block-position decay exp(-k / gamma) on the loss mask.
+    loss_decay_gamma: float
+    # Train the draft's embed_tokens/lm_head (streamed on every refit) instead
+    # of keeping the checkpoint copies frozen.
+    train_embed_and_head: bool
+
+
 class DraftConfig(TypedDict):
-    """Configuration for Eagle draft-model training alongside the policy model."""
+    """Configuration for draft-model co-training alongside the policy model.
+
+    algo selects the drafter family: "eagle3" (Megatron backend) or "dspark"
+    (DTensor-v2 backend). num_layers/aux_layer_indices apply to eagle3 only;
+    dspark carries its options in the dspark sub-block.
+    """
 
     enabled: Literal[True]
     model_name: NotRequired[str | None]
     loss_weight: NotRequired[float]
+    algo: NotRequired[Literal["eagle3", "dspark"]]
     num_layers: NotRequired[int | None]
     aux_layer_indices: NotRequired[list[int] | None]
+    dspark: NotRequired[DSparkDraftOptions]
 
 
 class TokenizerConfig(TypedDict):

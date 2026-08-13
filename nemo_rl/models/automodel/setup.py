@@ -800,6 +800,32 @@ def setup_model_and_optimizer(
             v.data = v.data.to("cpu")
         model = model.to("cpu")
 
+    # Build the DSpark draft model before optimizer construction so its params
+    # join the optimizer (and any optimizer-state resume) from the start.
+    draft_cfg = config.get("draft", {}) or {}
+    dspark_enabled = (
+        bool(draft_cfg.get("enabled", False))
+        and draft_cfg.get("algo", "eagle3") == "dspark"
+    )
+    draft_model = None
+    composite_model = None
+    if dspark_enabled:
+        from nemo_rl.models.automodel.draft.integration import (
+            PolicyWithDraft,
+            build_dspark_draft_model,
+        )
+
+        draft_dtype = model_config.torch_dtype
+        if not isinstance(draft_dtype, torch.dtype):
+            draft_dtype = getattr(torch, str(draft_dtype).removeprefix("torch."))
+        draft_model = build_dspark_draft_model(
+            model_name=draft_cfg["model_name"],
+            dspark_options=draft_cfg["dspark"],
+            torch_dtype=draft_dtype,
+            mesh=device_mesh["dp_cp"],
+        )
+        composite_model = PolicyWithDraft(policy=model, draft=draft_model)
+
     # Initialize optimizer
     optimizer = None
     if init_optimizer:
@@ -814,10 +840,25 @@ def setup_model_and_optimizer(
         # p.grad-is-None check, so passing frozen params (e.g. the visual
         # encoder in text-only training) causes DCP to save unused state that
         # later fails to reshard on resume.
-        optimizer = optimizer_cls(
-            (p for p in model.parameters() if p.requires_grad),
-            **optimizer_kwargs,
-        )
+        if draft_model is not None:
+            # Stable [policy, draft] param-group order; the optimizer-layout
+            # record saved with the checkpoint validates this on resume.
+            optimizer = optimizer_cls(
+                [
+                    {"params": [p for p in model.parameters() if p.requires_grad]},
+                    {
+                        "params": [
+                            p for p in draft_model.parameters() if p.requires_grad
+                        ]
+                    },
+                ],
+                **optimizer_kwargs,
+            )
+        else:
+            optimizer = optimizer_cls(
+                (p for p in model.parameters() if p.requires_grad),
+                **optimizer_kwargs,
+            )
 
     # Initialize scheduler
     scheduler = None
@@ -852,13 +893,40 @@ def setup_model_and_optimizer(
 
     # Load NeMo RL checkpoint if provided
     if weights_path:
-        checkpoint_manager.load_checkpoint(
-            model=model,
-            weights_path=weights_path,
-            optimizer=optimizer,
-            optimizer_path=optimizer_path,
-            scheduler=scheduler,
-        )
+        if draft_model is not None:
+            from nemo_rl.models.automodel.draft.integration import (
+                dspark_meta_record,
+                load_draft_checkpoint,
+            )
+
+            # Policy weights load as usual; the optimizer state pairs with the
+            # composite module because its param groups span policy + draft.
+            checkpoint_manager.load_checkpoint(
+                model=model,
+                weights_path=weights_path,
+            )
+            load_draft_checkpoint(
+                draft_model,
+                weights_path,
+                expected_meta=dspark_meta_record(
+                    draft_model, draft_cfg["model_name"], optimizer
+                ),
+            )
+            if optimizer_path and optimizer is not None:
+                checkpoint_manager.checkpointer.load_optimizer(
+                    optimizer=optimizer,
+                    model=composite_model,
+                    weights_path=optimizer_path,
+                    scheduler=scheduler,
+                )
+        else:
+            checkpoint_manager.load_checkpoint(
+                model=model,
+                weights_path=weights_path,
+                optimizer=optimizer,
+                optimizer_path=optimizer_path,
+                scheduler=scheduler,
+            )
     else:
         print(
             "No weights path provided. Loaded base HF weights via from_pretrained (default policy init)"
@@ -875,4 +943,6 @@ def setup_model_and_optimizer(
         model_config=model.config,
         peft_config=peft_config,
         autocast_enabled=autocast_enabled,
+        draft_model=draft_model,
+        composite_model=composite_model,
     )

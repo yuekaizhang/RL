@@ -17,7 +17,7 @@ import re
 import socket
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 import torch
 import zmq
@@ -416,16 +416,27 @@ class VllmInternalWorkerExtension:
             trimmed.append((key, tensor))
         return trimmed
 
+    def _speculative_method(self) -> Optional[str]:
+        spec_config = getattr(self.model_runner.vllm_config, "speculative_config", None)
+        return getattr(spec_config, "method", None) if spec_config else None
+
     def _get_drafter_model(self) -> Any:
         """Return the vLLM drafter's underlying model, or None if absent.
 
-        The drafter holds the speculative-decoding draft model (Eagle3 or MTP),
-        which vLLM keeps as a module separate from the main model. Typed ``Any``
-        because these are dynamic vLLM model classes whose ``load_weights`` /
-        ``mtp_start_layer_idx`` members are not visible through ``nn.Module``.
+        The drafter holds the speculative-decoding draft model (Eagle3, MTP, or
+        DSpark), which vLLM keeps as a module separate from the main model. The
+        eagle3 layout exposes it at ``model_runner.drafter.model``; the newer
+        gpu-worker speculator layout (used by DSpark) at
+        ``model_runner.speculator.model``. Typed ``Any`` because these are
+        dynamic vLLM model classes whose ``load_weights`` / ``mtp_start_layer_idx``
+        members are not visible through ``nn.Module``.
         """
-        draft_owner = getattr(self.model_runner, "drafter", None)
-        return getattr(draft_owner, "model", None) if draft_owner else None
+        for owner_attr in ("drafter", "speculator"):
+            draft_owner = getattr(self.model_runner, owner_attr, None)
+            draft_model = getattr(draft_owner, "model", None) if draft_owner else None
+            if draft_model is not None:
+                return draft_model
+        return None
 
     def _load_draft_weights(
         self, draft_weights: list[tuple[str, torch.Tensor]]
@@ -435,6 +446,16 @@ class VllmInternalWorkerExtension:
 
         draft_model = self._get_drafter_model()
         if draft_model is None:
+            if self._speculative_method() == "dspark":
+                # DSpark co-training streams every draft weight on each refit;
+                # a rank that runs a dspark speculative config but exposes no
+                # speculator would silently generate with stale draft weights.
+                raise RuntimeError(
+                    "[draft] Received DSpark draft weights but no drafter model "
+                    "was found at model_runner.drafter.model or "
+                    "model_runner.speculator.model. The pinned vLLM's dspark "
+                    "speculator layout may have changed."
+                )
             logger.warning(
                 "[draft] Received draft weights but vLLM drafter is unavailable; skipping draft update."
             )

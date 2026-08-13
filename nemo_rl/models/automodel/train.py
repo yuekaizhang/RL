@@ -41,7 +41,11 @@ from nemo_rl.algorithms.logits_sampling_utils import (
     apply_top_k_top_p,
     need_top_k_or_top_p_filtering,
 )
-from nemo_rl.algorithms.loss import SequencePackingLossWrapper, prepare_loss_input
+from nemo_rl.algorithms.loss import (
+    DSparkLossWrapper,
+    SequencePackingLossWrapper,
+    prepare_loss_input,
+)
 from nemo_rl.algorithms.loss.interfaces import LossFunction
 from nemo_rl.algorithms.utils import mask_out_neg_inf_logprobs
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
@@ -368,6 +372,19 @@ def forward_with_post_processing_fn(
     logits = extract_logits(model, outputs)
     del outputs
 
+    # DSpark distills against the policy's raw logits; stash them before the
+    # (in-place) temperature scaling below mutates the tensor.
+    if (
+        isinstance(post_processing_fn, LossPostProcessor)
+        and getattr(post_processing_fn, "dspark_runtime", None) is not None
+    ):
+        will_scale_inplace = (
+            sampling_params is not None and sampling_params.temperature != 1.0
+        )
+        post_processing_fn.dspark_runtime.stash_teacher_logits(
+            logits, will_scale_inplace
+        )
+
     # Apply temperature scaling only for sampling-oriented post-processors
     # Score computations should use unscaled logits
     if isinstance(
@@ -566,6 +583,7 @@ class LossPostProcessor:
         dp_size: int,
         enable_seq_packing: bool = False,
         sampling_params: Optional[TrainingSamplingParams] = None,
+        dspark_runtime: Optional[Any] = None,
     ):
         """Initialize LossPostProcessor.
 
@@ -579,6 +597,10 @@ class LossPostProcessor:
             dp_size: Data parallel size
             enable_seq_packing: Whether sequence packing is enabled
             sampling_params: Sampling parameters
+            dspark_runtime: Optional DSpark co-training runtime; when set, the
+                policy loss is combined with the DSpark draft loss and the
+                policy's raw logits are stashed as the distillation teacher
+                before temperature scaling.
         """
         self.loss_fn: LossFunction = loss_fn
         self.cfg: PolicyConfig = cfg
@@ -589,6 +611,9 @@ class LossPostProcessor:
         self.dp_size = dp_size
         self.enable_seq_packing = enable_seq_packing
         self.sampling_params = sampling_params
+        self.dspark_runtime = dspark_runtime
+        if dspark_runtime is not None and enable_seq_packing:
+            raise ValueError("DSpark co-training does not support sequence packing.")
 
     def __call__(
         self,
@@ -634,6 +659,18 @@ class LossPostProcessor:
                 cu_seqlens_q_padded=processed_inputs.flash_attn_kwargs.cu_seqlens_q,
             )
             loss, loss_metrics = loss_fn(
+                logits,
+                data_dict,
+                global_valid_seqs,
+                global_valid_toks,
+            )
+        elif self.dspark_runtime is not None:
+            dspark_wrapper = DSparkLossWrapper(
+                loss_fn=self.loss_fn,
+                prepare_fn=prepare_loss_input_wrapped,
+                dspark_runtime=self.dspark_runtime,
+            )
+            loss, loss_metrics = dspark_wrapper(
                 logits,
                 data_dict,
                 global_valid_seqs,

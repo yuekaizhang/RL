@@ -123,11 +123,45 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
                 "Configure either Megatron (policy.megatron_cfg.enabled=true) or "
                 "DTensor (policy.dtensor_cfg.enabled=true), not both."
             )
-        if draft_enabled and not megatron_enable:
+        draft_algo = config.get("draft", {}).get("algo", "eagle3")
+        if draft_enabled and draft_algo == "eagle3" and not megatron_enable:
             raise ValueError(
-                "policy.draft.enabled=true is only supported with the Megatron backend. "
+                "policy.draft.algo=eagle3 is only supported with the Megatron backend. "
                 "Set policy.megatron_cfg.enabled=true or disable policy.draft."
             )
+        if draft_enabled and draft_algo == "dspark":
+            dtensor_cfg = config.get("dtensor_cfg", {})
+            if megatron_enable or not (
+                dtensor_enable and dtensor_cfg.get("_v2", False)
+            ):
+                raise ValueError(
+                    "policy.draft.algo=dspark requires the DTensor v2 backend "
+                    "(policy.dtensor_cfg.enabled=true and policy.dtensor_cfg._v2=true)."
+                )
+            if config.get("draft", {}).get("model_name") is None:
+                raise ValueError(
+                    "policy.draft.algo=dspark requires a pretrained DSpark checkpoint; "
+                    "set policy.draft.model_name (from-scratch draft init is not supported)."
+                )
+            unsupported = {
+                "tensor_parallel_size > 1": dtensor_cfg.get("tensor_parallel_size", 1)
+                > 1,
+                "context_parallel_size > 1": dtensor_cfg.get("context_parallel_size", 1)
+                > 1,
+                "activation_checkpointing": bool(
+                    dtensor_cfg.get("activation_checkpointing", False)
+                ),
+                "lora_cfg.enabled": bool(
+                    dtensor_cfg.get("lora_cfg", {}).get("enabled", False)
+                ),
+            }
+            enabled_unsupported = [name for name, on in unsupported.items() if on]
+            if enabled_unsupported:
+                raise ValueError(
+                    "policy.draft.algo=dspark does not support: "
+                    f"{', '.join(enabled_unsupported)}. Disable these options to "
+                    "co-train a DSpark draft."
+                )
         if draft_enabled and bool(
             config.get("sequence_packing", {}).get("enabled", False)
         ):

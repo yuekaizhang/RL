@@ -289,6 +289,50 @@ class DraftLossWrapper:
         return combined_loss, metrics
 
 
+class DSparkLossWrapper:
+    """Combine policy loss with the DSpark block-drafter loss (automodel path).
+
+    Structural sibling of DraftLossWrapper: the policy loss is computed exactly
+    as without a draft, then the DSpark loss runs the draft forward on the
+    hidden states and raw teacher logits captured during the policy forward
+    (both detached, so the policy trunk's gradients are unchanged).
+    """
+
+    def __init__(
+        self,
+        loss_fn: Callable[..., tuple[torch.Tensor, dict[str, Any]]],
+        prepare_fn: Callable[..., Any],
+        dspark_runtime: Any,
+    ):
+        self.loss_fn = loss_fn
+        self.prepare_fn = prepare_fn
+        self.dspark_runtime = dspark_runtime
+
+    def __call__(
+        self,
+        next_token_logits: torch.Tensor,
+        data: BatchedDataDict[Any],
+        global_valid_seqs: torch.Tensor | None,
+        global_valid_toks: torch.Tensor | None,
+    ) -> tuple[torch.Tensor, dict[str, Any]]:
+        loss_input, prepared_data = self.prepare_fn(
+            next_token_logits,
+            data,
+            self.loss_fn,
+        )
+        policy_loss, metrics = self.loss_fn(
+            data=prepared_data,
+            global_valid_seqs=global_valid_seqs,
+            global_valid_toks=global_valid_toks,
+            **loss_input,
+        )
+
+        draft_loss, draft_metrics = self.dspark_runtime.compute_loss(prepared_data)
+        combined_loss = policy_loss + self.dspark_runtime.loss_weight * draft_loss
+        metrics.update(draft_metrics)
+        return combined_loss, metrics
+
+
 def wrap_loss_fn_with_input_preparation(
     next_token_logits: Tensor,
     data: BatchedDataDict[Any],
