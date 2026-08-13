@@ -49,3 +49,4 @@ code_snapshots*/
 .claude/review-memory/
 .humanize*
 smoke_logs/
+.claude/settings.local.json
