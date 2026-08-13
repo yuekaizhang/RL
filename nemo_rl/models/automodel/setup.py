@@ -841,15 +841,20 @@ def setup_model_and_optimizer(
         # encoder in text-only training) causes DCP to save unused state that
         # later fails to reshard on resume.
         if draft_model is not None:
-            # Stable [policy, draft] param-group order; the optimizer-layout
-            # record saved with the checkpoint validates this on resume.
+            # Named [policy, draft] param groups in stable order; the layout
+            # record saved with the checkpoint validates names, order, and
+            # per-group param counts on resume (hard error on mismatch).
             optimizer = optimizer_cls(
                 [
-                    {"params": [p for p in model.parameters() if p.requires_grad]},
                     {
+                        "name": "policy",
+                        "params": [p for p in model.parameters() if p.requires_grad],
+                    },
+                    {
+                        "name": "draft",
                         "params": [
                             p for p in draft_model.parameters() if p.requires_grad
-                        ]
+                        ],
                     },
                 ],
                 **optimizer_kwargs,

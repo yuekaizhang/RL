@@ -504,3 +504,138 @@ def test_maybe_process_mtp_drafter_after_loading_noop_when_disk_loaded(monkeypat
     ext._maybe_process_mtp_drafter_after_loading()
 
     process_weights.assert_not_called()
+
+
+def _make_dspark_refit_extension(
+    vllm_backend, *, has_speculator=True, drafter_param_names=None
+):
+    """Extension wired for DSpark refit-manifest tests.
+
+    The fake drafter mimics the pinned vLLM Qwen3DSparkForCausalLM layout:
+    fused qkv/gate_up parameters, a mask_embedding placeholder, and an owned
+    lm_head. Ownership is controlled via vllm_backend.get_pp_group in tests.
+    """
+    if drafter_param_names is None:
+        drafter_param_names = [
+            "model.embed_tokens.weight",
+            "model.layers.0.self_attn.qkv_proj.weight",
+            "model.layers.0.self_attn.q_norm.weight",
+            "model.layers.0.mlp.gate_up_proj.weight",
+            "model.fc.weight",
+            "model.hidden_norm.weight",
+            "model.norm.weight",
+            "model.markov_head.markov_w1.weight",
+            "model.markov_head.markov_w2.weight",
+            "model.mask_embedding",
+            "lm_head.weight",
+        ]
+    ext = vllm_backend.VllmInternalWorkerExtension.__new__(
+        vllm_backend.VllmInternalWorkerExtension
+    )
+    drafter_model = None
+    if has_speculator:
+        drafter_model = SimpleNamespace(
+            named_parameters=lambda: [(n, None) for n in drafter_param_names],
+            load_weights=MagicMock(),
+        )
+    ext.model_runner = SimpleNamespace(
+        vllm_config=SimpleNamespace(
+            speculative_config=SimpleNamespace(method="dspark")
+        ),
+        speculator=SimpleNamespace(model=drafter_model) if has_speculator else None,
+    )
+    return ext, drafter_model
+
+
+def _complete_dspark_draft_info():
+    keys = [
+        "draft.embed_tokens.weight",
+        "draft.layers.0.self_attn.q_proj.weight",
+        "draft.layers.0.self_attn.k_proj.weight",
+        "draft.layers.0.self_attn.v_proj.weight",
+        "draft.layers.0.self_attn.q_norm.weight",
+        "draft.layers.0.mlp.gate_proj.weight",
+        "draft.layers.0.mlp.up_proj.weight",
+        "draft.fc.weight",
+        "draft.hidden_norm.weight",
+        "draft.norm.weight",
+        "draft.markov_head.markov_w1.weight",
+        "draft.markov_head.markov_w2.weight",
+        "draft.lm_head.weight",
+    ]
+    info = {key: ((4, 4), torch.bfloat16) for key in keys}
+    info["model.weight"] = ((4, 4), torch.bfloat16)
+    return info
+
+
+@pytest.mark.vllm
+def test_dspark_owner_accepts_complete_draft_manifest(monkeypatch):
+    from nemo_rl.models.generation.vllm import vllm_backend
+
+    ext, _ = _make_dspark_refit_extension(vllm_backend)
+    monkeypatch.setattr(
+        vllm_backend, "get_pp_group", lambda: SimpleNamespace(is_last_rank=True)
+    )
+    info = _complete_dspark_draft_info()
+    # Keys the drafter's loader intentionally skips are tolerated as extras.
+    info["draft.confidence_head.proj.weight"] = ((4,), torch.bfloat16)
+    ext.prepare_refit_info(info)
+    assert ext.state_dict_info is info
+
+
+@pytest.mark.vllm
+@pytest.mark.parametrize(
+    "dropped_key",
+    ["draft.embed_tokens.weight", "draft.lm_head.weight"],
+)
+def test_dspark_owner_rejects_missing_draft_keys(monkeypatch, dropped_key):
+    from nemo_rl.models.generation.vllm import vllm_backend
+
+    ext, _ = _make_dspark_refit_extension(vllm_backend)
+    monkeypatch.setattr(
+        vllm_backend, "get_pp_group", lambda: SimpleNamespace(is_last_rank=True)
+    )
+    info = _complete_dspark_draft_info()
+    del info[dropped_key]
+    with pytest.raises(RuntimeError, match="missing draft keys"):
+        ext.prepare_refit_info(info)
+
+
+@pytest.mark.vllm
+def test_dspark_owner_rejects_unexpected_draft_keys(monkeypatch):
+    from nemo_rl.models.generation.vllm import vllm_backend
+
+    ext, _ = _make_dspark_refit_extension(vllm_backend)
+    monkeypatch.setattr(
+        vllm_backend, "get_pp_group", lambda: SimpleNamespace(is_last_rank=True)
+    )
+    info = _complete_dspark_draft_info()
+    info["draft.renamed_bogus.weight"] = ((4, 4), torch.bfloat16)
+    with pytest.raises(RuntimeError, match="unexpected draft keys"):
+        ext.prepare_refit_info(info)
+
+
+@pytest.mark.vllm
+def test_dspark_non_owner_skips_draft_payloads(monkeypatch):
+    from nemo_rl.models.generation.vllm import vllm_backend
+
+    ext, _ = _make_dspark_refit_extension(vllm_backend, has_speculator=False)
+    monkeypatch.setattr(
+        vllm_backend, "get_pp_group", lambda: SimpleNamespace(is_last_rank=False)
+    )
+    # Non-owning ranks neither validate the draft manifest nor require a
+    # drafter for draft payloads.
+    ext.prepare_refit_info(_complete_dspark_draft_info())
+    ext._load_draft_weights([("embed_tokens.weight", torch.zeros(1))])
+
+
+@pytest.mark.vllm
+def test_dspark_owner_without_speculator_raises(monkeypatch):
+    from nemo_rl.models.generation.vllm import vllm_backend
+
+    ext, _ = _make_dspark_refit_extension(vllm_backend, has_speculator=False)
+    monkeypatch.setattr(
+        vllm_backend, "get_pp_group", lambda: SimpleNamespace(is_last_rank=True)
+    )
+    with pytest.raises(RuntimeError, match="no drafter"):
+        ext._load_draft_weights([("embed_tokens.weight", torch.zeros(1))])

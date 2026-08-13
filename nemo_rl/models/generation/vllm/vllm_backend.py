@@ -59,6 +59,12 @@ except ImportError:
 WeightUpdateTransport = Literal["ipc", "collective"]
 WeightUpdateFinalizer = Callable[[], None]
 
+# Incoming DSpark stream keys the drafter's loader intentionally skips
+# (mask_embedding is a placeholder param, the confidence head is not wired
+# into inference, and t2d is training-only). They are tolerated as extras in
+# the refit manifest and excluded from the required key set.
+_DSPARK_SKIPPED_KEY_SUBSTRINGS = ("mask_embedding", "confidence_head", "t2d")
+
 
 def _format_refit_key_error(label: str, keys: set[str]) -> str:
     """Format a bounded refit-key diagnostic."""
@@ -316,11 +322,19 @@ class VllmInternalWorkerExtension:
     def prepare_refit_info(self, state_dict_info: dict[str, Any]) -> None:
         """Prepare state dict metadata for weight refitting and IPC streaming.
 
+        For DSpark speculative decoding, the trainer-provided ``draft.*`` keys
+        are validated here against the drafter's own loadable layout. Combined
+        with the per-refit manifests (the IPC path enforces every
+        ``state_dict_info`` key exactly once, and the collective path iterates
+        ``state_dict_info`` by construction), this proves on every transport
+        that the full expected draft key set is delivered.
+
         Args:
             state_dict_info (dict): A dictionary containing the info for refit.
                 e.g. {tensor_name: (shape, dtype)}
         """
         self.state_dict_info = state_dict_info  # pyrefly: ignore[implicitly-defined-attribute]  This class does not define __init__ so assignments like this should be ignored
+        self._validate_dspark_refit_info(state_dict_info)
 
     def prepare_sparse_delta_refit_info(
         self, state_dict_info: dict[str, tuple[tuple[int, ...], torch.dtype]]
@@ -420,6 +434,91 @@ class VllmInternalWorkerExtension:
         spec_config = getattr(self.model_runner.vllm_config, "speculative_config", None)
         return getattr(spec_config, "method", None) if spec_config else None
 
+    def _dspark_owns_speculator(self) -> bool:
+        """Whether this rank should own the DSpark speculator.
+
+        vLLM keeps the drafter on the last pipeline stage, so earlier stages
+        legitimately have no speculator and must skip draft payloads; every
+        rank owns it in single-stage layouts.
+        """
+        if self._speculative_method() != "dspark":
+            return False
+        try:
+            return bool(get_pp_group().is_last_rank)
+        except Exception:
+            # No initialized PP group (single-process layouts, unit tests).
+            return True
+
+    def _dspark_expected_draft_keys(self) -> set[str]:
+        """Expected incoming ``draft.*`` keys derived from the drafter's layout.
+
+        Inverts ``Qwen3DSparkForCausalLM.load_weights``' name handling: trainer
+        names are prefixed with ``model.`` (except ``lm_head.*``, and ``d2t``
+        which maps to ``draft_id_to_target_id``), and fused parameters load
+        from their stacked components (qkv_proj <- q/k/v_proj,
+        gate_up_proj <- gate/up_proj). Parameters the loader never feeds from
+        the stream (see _DSPARK_SKIPPED_KEY_SUBSTRINGS) are excluded.
+        """
+        draft_model = self._get_drafter_model()
+        if draft_model is None:
+            raise RuntimeError(
+                "[draft] DSpark refit validation requires the drafter model, but "
+                "none was found at model_runner.drafter.model or "
+                "model_runner.speculator.model on a speculator-owning rank."
+            )
+        fused_expansions = {
+            "qkv_proj": ("q_proj", "k_proj", "v_proj"),
+            "gate_up_proj": ("gate_proj", "up_proj"),
+        }
+        expected: set[str] = set()
+        for name, _ in draft_model.named_parameters():
+            if any(s in name for s in _DSPARK_SKIPPED_KEY_SUBSTRINGS):
+                continue
+            if name == "draft_id_to_target_id":
+                expected.add("draft.d2t")
+                continue
+            trainer_name = name.removeprefix("model.")
+            segments = trainer_name.split(".")
+            fused = next((s for s in segments if s in fused_expansions), None)
+            if fused is None:
+                expected.add(f"draft.{trainer_name}")
+            else:
+                for part in fused_expansions[fused]:
+                    expected.add(
+                        "draft." + ".".join(part if s == fused else s for s in segments)
+                    )
+        return expected
+
+    def _validate_dspark_refit_info(self, state_dict_info: dict[str, Any]) -> None:
+        """Hard-error when the trainer's ``draft.*`` manifest mismatches the drafter.
+
+        Owning ranks require exactly the drafter's loadable key set (plus keys
+        the loader intentionally skips); non-owning ranks ignore draft payloads
+        entirely and are never required to have a drafter.
+        """
+        if self._speculative_method() != "dspark":
+            return
+        if not self._dspark_owns_speculator():
+            return
+        provided = {k for k in state_dict_info if k.startswith("draft.")}
+        expected = self._dspark_expected_draft_keys()
+        missing = expected - provided
+        unexpected = {
+            key
+            for key in provided - expected
+            if not any(s in key for s in _DSPARK_SKIPPED_KEY_SUBSTRINGS)
+        }
+        errors = []
+        if missing:
+            errors.append(_format_refit_key_error("missing draft keys", missing))
+        if unexpected:
+            errors.append(_format_refit_key_error("unexpected draft keys", unexpected))
+        if errors:
+            raise RuntimeError(
+                "[draft] DSpark refit manifest does not match the vLLM drafter "
+                "layout: " + "; ".join(errors)
+            )
+
     def _get_drafter_model(self) -> Any:
         """Return the vLLM drafter's underlying model, or None if absent.
 
@@ -447,15 +546,19 @@ class VllmInternalWorkerExtension:
         draft_model = self._get_drafter_model()
         if draft_model is None:
             if self._speculative_method() == "dspark":
-                # DSpark co-training streams every draft weight on each refit;
-                # a rank that runs a dspark speculative config but exposes no
-                # speculator would silently generate with stale draft weights.
-                raise RuntimeError(
-                    "[draft] Received DSpark draft weights but no drafter model "
-                    "was found at model_runner.drafter.model or "
-                    "model_runner.speculator.model. The pinned vLLM's dspark "
-                    "speculator layout may have changed."
-                )
+                if self._dspark_owns_speculator():
+                    # DSpark co-training streams every draft weight on each
+                    # refit; an owning rank without a speculator would silently
+                    # generate with stale draft weights.
+                    raise RuntimeError(
+                        "[draft] Received DSpark draft weights but no drafter "
+                        "model was found at model_runner.drafter.model or "
+                        "model_runner.speculator.model. The pinned vLLM's "
+                        "dspark speculator layout may have changed."
+                    )
+                # Non-owning pipeline stages legitimately have no speculator;
+                # draft payloads are not theirs to load.
+                return
             logger.warning(
                 "[draft] Received draft weights but vLLM drafter is unavailable; skipping draft update."
             )

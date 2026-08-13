@@ -386,8 +386,29 @@ def dspark_capture_ctx(runtime: "DSparkRuntime"):
         runtime.capture.deactivate()
 
 
-def optimizer_layout_record(optimizer: torch.optim.Optimizer) -> list[dict[str, int]]:
-    return [{"num_params": len(group["params"])} for group in optimizer.param_groups]
+DSPARK_OPTIMIZER_GROUP_NAMES = ("policy", "draft")
+
+
+def optimizer_layout_record(
+    optimizer: torch.optim.Optimizer,
+) -> list[dict[str, Any]]:
+    """Record named param-group layout for resume validation.
+
+    A DSpark co-training optimizer must consist of exactly the named groups
+    ["policy", "draft"] in that order; anything else means the optimizer was
+    not built by the dspark setup path and its state cannot be paired safely.
+    """
+    names = [group.get("name") for group in optimizer.param_groups]
+    if tuple(names) != DSPARK_OPTIMIZER_GROUP_NAMES:
+        raise ValueError(
+            "DSpark co-training expects optimizer param groups named "
+            f"{list(DSPARK_OPTIMIZER_GROUP_NAMES)} in that order, got {names}. "
+            "The optimizer was not constructed by the dspark setup path."
+        )
+    return [
+        {"name": group["name"], "num_params": len(group["params"])}
+        for group in optimizer.param_groups
+    ]
 
 
 def dspark_meta_record(
