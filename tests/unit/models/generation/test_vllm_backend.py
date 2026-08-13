@@ -639,3 +639,18 @@ def test_dspark_owner_without_speculator_raises(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="no drafter"):
         ext._load_draft_weights([("embed_tokens.weight", torch.zeros(1))])
+
+
+@pytest.mark.vllm
+def test_dspark_static_drafter_manifest_without_draft_keys_passes(monkeypatch):
+    """policy.draft.enabled=false: drafter loads from disk, refits carry only
+    policy weights, and the manifest legitimately has zero draft.* keys."""
+    from nemo_rl.models.generation.vllm import vllm_backend
+
+    ext, _ = _make_dspark_refit_extension(vllm_backend)
+    monkeypatch.setattr(
+        vllm_backend, "get_pp_group", lambda: SimpleNamespace(is_last_rank=True)
+    )
+    info = {"model.weight": ((4, 4), torch.bfloat16)}
+    ext.prepare_refit_info(info)
+    assert ext.state_dict_info is info

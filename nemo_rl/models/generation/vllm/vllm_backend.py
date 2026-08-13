@@ -501,6 +501,12 @@ class VllmInternalWorkerExtension:
         if not self._dspark_owns_speculator():
             return
         provided = {k for k in state_dict_info if k.startswith("draft.")}
+        if not provided:
+            # Static-drafter mode: with policy.draft.enabled=false the drafter
+            # is loaded from its checkpoint at startup and refits legitimately
+            # carry only policy weights. Exact-key validation applies only when
+            # the trainer co-trains (and therefore streams) the draft.
+            return
         expected = self._dspark_expected_draft_keys()
         missing = expected - provided
         unexpected = {
