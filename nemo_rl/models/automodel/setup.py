@@ -815,9 +815,12 @@ def setup_model_and_optimizer(
             build_dspark_draft_model,
         )
 
-        draft_dtype = model_config.torch_dtype
-        if not isinstance(draft_dtype, torch.dtype):
-            draft_dtype = getattr(torch, str(draft_dtype).removeprefix("torch."))
+        # Use the configured training precision, NOT model_config.torch_dtype:
+        # validate_and_prepare_config pins the policy config to float32 for
+        # master weights, and a float32 draft would double its parameter and
+        # transient memory in the already memory-tight co-training recipe.
+        # The shared optimizer's master weights preserve update precision.
+        draft_dtype = runtime_config.dtype
         draft_model = build_dspark_draft_model(
             model_name=draft_cfg["model_name"],
             dspark_options=draft_cfg["dspark"],
