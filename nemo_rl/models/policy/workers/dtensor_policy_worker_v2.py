@@ -653,8 +653,12 @@ class DTensorPolicyWorkerV2Impl(
                 dtype=self.dtype,
             )
             if dspark_runtime is not None and not eval_mode:
-                # Like grad_norm, this reflects the last global batch.
-                metrics["draft_grad_norm"] = draft_grad_norm
+                # Like grad_norm, this reflects the last global batch. Returned
+                # as a CPU tensor to match the Megatron worker's return type
+                # (the trainer calls .numpy() on it).
+                metrics["draft_grad_norm"] = torch.tensor(
+                    draft_grad_norm, device="cpu", dtype=torch.float32
+                )
 
             self.timer.stop("train")
             return metrics
