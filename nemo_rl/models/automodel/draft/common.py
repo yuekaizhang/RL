@@ -15,7 +15,10 @@
 # Vendored from NVIDIA NeMo Automodel @ 6f423feb0
 # Source: nemo_automodel/components/speculative/dspark/common.py
 # Local modifications: import paths rewritten to nemo_rl.models.automodel.draft;
-# see file-specific notes below if any.
+# build_anchor_candidate_mask gates anchors on the FIRST TARGET token's loss
+# mask rather than the anchor token's own mask, so RL rollouts supervise the
+# prompt-to-first-response transition (where inference-time drafting starts)
+# and one-token responses still produce draft signal.
 import logging
 from dataclasses import dataclass
 from typing import Optional
@@ -145,9 +148,14 @@ def build_anchor_candidate_mask(
     if num_candidates == 0:
         return loss_mask[:, :0].bool()
 
-    anchor_valid = loss_mask[:, :num_candidates] > 0.5
-    first_target_valid = loss_mask[:, 1 : num_candidates + 1] > 0.5
-    valid = anchor_valid & first_target_valid
+    # An anchor is valid when the token it predicts (anchor + 1) is inside the
+    # supervised region; the anchor token itself only seeds the block and may
+    # sit outside it. In RL rollouts the response's first token is anchored at
+    # the final prompt token (loss mask 0) — exactly where speculative
+    # drafting starts at inference — so gating on the anchor's own mask (as
+    # the upstream pretraining sampler did) would drop the prompt-to-response
+    # transition and leave one-token responses with no draft supervision.
+    valid = loss_mask[:, 1 : num_candidates + 1] > 0.5
     if doc_remaining is not None:
         # Packing: the anchor's first target (anchor + 1) must stay in the anchor's
         # document, i.e. at least one real token follows the anchor in its document.
