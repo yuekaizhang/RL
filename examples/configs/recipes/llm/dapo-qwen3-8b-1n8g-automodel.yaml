@@ -59,14 +59,9 @@ policy:
     activation_checkpointing: false
     env_vars:
       PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
-    automodel_kwargs:
-      backend:
-        _target_: nemo_automodel.components.models.common.utils.BackendConfig
-        attn: te
-        linear: te
-        rms_norm: torch_fp32
-        rope_fusion: false
-        enable_hf_state_dict_adapter: true
+    # No automodel_kwargs.backend here: Qwen3-8B loads as a plain HF
+    # Qwen3ForCausalLM, which does not accept the BackendConfig kwarg used by
+    # nemo_automodel's custom model classes (e.g. the nano-v3.5 MoE recipe).
   sequence_packing:
     enabled: false
   dynamic_batching:
