@@ -124,6 +124,11 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
                 "DTensor (policy.dtensor_cfg.enabled=true), not both."
             )
         draft_algo = config.get("draft", {}).get("algo", "eagle3")
+        if draft_enabled and draft_algo not in ("eagle3", "dspark"):
+            raise ValueError(
+                f"policy.draft.algo must be one of {{'eagle3', 'dspark'}} when "
+                f"policy.draft.enabled=true, got {draft_algo!r}."
+            )
         if draft_enabled and draft_algo == "eagle3" and not megatron_enable:
             raise ValueError(
                 "policy.draft.algo=eagle3 is only supported with the Megatron backend. "
