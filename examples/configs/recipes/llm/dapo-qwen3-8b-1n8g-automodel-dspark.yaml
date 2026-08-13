@@ -14,7 +14,13 @@ policy:
     algo: "dspark"
     loss_weight: 1.0
     dspark:
-      num_anchors: 512
+      # Draft-side transient memory scales with num_anchors x block_size x
+      # vocab (draft logits + markov bias + teacher gather, ~1 GiB each in
+      # bf16 at 512 anchors). Co-training shares the GPU with full 8B policy
+      # training (activation checkpointing off), so 512 anchors OOMs on
+      # 80 GiB; 128 anchors fits and still supervises ~900 block positions
+      # per sequence each step.
+      num_anchors: 128
       ce_loss_alpha: 0.1
       l1_loss_alpha: 0.9
       confidence_loss_alpha: 1.0
