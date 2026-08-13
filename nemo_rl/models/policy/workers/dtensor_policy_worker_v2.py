@@ -337,21 +337,21 @@ class DTensorPolicyWorkerV2Impl(
             optimizer_path=optimizer_path,
         )
 
-        # Set instance attributes from model and optimizer state (tuple unpacking)
-        (
-            self.model,
-            self.optimizer,
-            self.scheduler,
-            self.is_hf_model,
-            self.is_moe_model,
-            self._is_reward_model,  # Note: using underscore prefix for internal naming
-            self.model_class,
-            self.model_config,
-            self.peft_config,
-            self.autocast_enabled,
-            self.draft_model,
-            self.composite_model,
-        ) = model_and_optimizer_state
+        # Set instance attributes from model and optimizer state. Access by
+        # field name (not positional unpacking) so optional fields appended to
+        # ModelAndOptimizerState stay backward compatible across workers.
+        self.model = model_and_optimizer_state.model
+        self.optimizer = model_and_optimizer_state.optimizer
+        self.scheduler = model_and_optimizer_state.scheduler
+        self.is_hf_model = model_and_optimizer_state.is_hf_model
+        self.is_moe_model = model_and_optimizer_state.is_moe_model
+        self._is_reward_model = model_and_optimizer_state.is_reward_model
+        self.model_class = model_and_optimizer_state.model_class
+        self.model_config = model_and_optimizer_state.model_config
+        self.peft_config = model_and_optimizer_state.peft_config
+        self.autocast_enabled = model_and_optimizer_state.autocast_enabled
+        self.draft_model = model_and_optimizer_state.draft_model
+        self.composite_model = model_and_optimizer_state.composite_model
 
         # DSpark co-training runtime (draft loss, hidden capture, grad-norm
         # reporting). Present only when policy.draft.algo=dspark.
