@@ -60,3 +60,17 @@ def test_architecture_mismatch_always_rejected():
     expected = dict(_TRAINING_META, block_size=4, optimizer_layout=None)
     with pytest.raises(ValueError, match="block_size"):
         validate_dspark_checkpoint_meta(_TRAINING_META, expected)
+
+
+def test_draft_checkpoint_dir_is_sibling_of_weights_tree():
+    """The draft DCP entry must not live under the policy weights directory:
+    detect_checkpoint_format walks weights_path recursively and would
+    mis-detect the safetensors policy as DCP after seeing .distcp files."""
+    from nemo_rl.models.automodel.draft.integration import draft_checkpoint_dir
+
+    weights = "/ckpt/step_3/policy/weights"
+    draft_dir = draft_checkpoint_dir(weights)
+    assert draft_dir == "/ckpt/step_3/policy/draft"
+    assert not (draft_dir + "/").startswith(weights + "/")
+    # Trailing slashes must not change the derivation.
+    assert draft_checkpoint_dir(weights + "/") == draft_dir

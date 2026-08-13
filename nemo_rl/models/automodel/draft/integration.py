@@ -426,6 +426,20 @@ def dspark_meta_record(
     }
 
 
+def draft_checkpoint_dir(weights_path: str) -> str:
+    """The draft's DCP directory: a SIBLING of the policy weights directory.
+
+    The draft must live outside the policy weight tree because
+    ``detect_checkpoint_format(weights_path)`` walks it recursively and would
+    mis-detect the safetensors policy checkpoint as DCP after seeing the
+    draft's ``.distcp`` files.
+    """
+    return os.path.join(
+        os.path.dirname(os.path.abspath(os.path.normpath(weights_path))),
+        DRAFT_CHECKPOINT_DIRNAME,
+    )
+
+
 def save_draft_checkpoint(
     draft_model: Qwen3DSparkModel,
     weights_path: str,
@@ -435,7 +449,7 @@ def save_draft_checkpoint(
     import torch.distributed.checkpoint as dcp
     from torch.distributed.checkpoint.state_dict import get_model_state_dict
 
-    draft_dir = os.path.join(weights_path, DRAFT_CHECKPOINT_DIRNAME)
+    draft_dir = draft_checkpoint_dir(weights_path)
     state_dict = get_model_state_dict(draft_model)
     dcp.save(state_dict, checkpoint_id=draft_dir)
     if not dist.is_initialized() or dist.get_rank() == 0:
@@ -480,7 +494,7 @@ def load_draft_checkpoint(
         set_model_state_dict,
     )
 
-    draft_dir = os.path.join(weights_path, DRAFT_CHECKPOINT_DIRNAME)
+    draft_dir = draft_checkpoint_dir(weights_path)
     meta_path = os.path.join(draft_dir, DSPARK_META_FILENAME)
     if not os.path.isdir(draft_dir) or not os.path.isfile(meta_path):
         raise FileNotFoundError(
