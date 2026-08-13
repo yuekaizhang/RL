@@ -445,6 +445,29 @@ def save_draft_checkpoint(
         dist.barrier()
 
 
+def validate_dspark_checkpoint_meta(
+    saved_meta: dict[str, Any], expected_meta: dict[str, Any]
+) -> None:
+    """Hard-error on inconsistent dspark checkpoint metadata.
+
+    Architecture fields are always compared. The optimizer layout is compared
+    only when the current run restores optimizer state (expected layout is
+    non-None): weights-only loads (init_optimizer=False, e.g. eval or
+    logprob-only workers) legitimately carry no layout while training
+    checkpoints do.
+    """
+    keys = ["block_size", "mask_token_id", "target_layer_ids"]
+    if expected_meta.get("optimizer_layout") is not None:
+        keys.append("optimizer_layout")
+    for key in keys:
+        if saved_meta.get(key) != expected_meta.get(key):
+            raise ValueError(
+                f"DSpark checkpoint metadata mismatch for '{key}': checkpoint has "
+                f"{saved_meta.get(key)!r}, current run expects {expected_meta.get(key)!r}. "
+                "Refusing to resume with an inconsistent draft configuration."
+            )
+
+
 def load_draft_checkpoint(
     draft_model: Qwen3DSparkModel,
     weights_path: str,
@@ -466,13 +489,7 @@ def load_draft_checkpoint(
         )
     with open(meta_path) as f:
         saved_meta = json.load(f)
-    for key in ("block_size", "mask_token_id", "target_layer_ids", "optimizer_layout"):
-        if saved_meta.get(key) != expected_meta.get(key):
-            raise ValueError(
-                f"DSpark checkpoint metadata mismatch for '{key}': checkpoint has "
-                f"{saved_meta.get(key)!r}, current run expects {expected_meta.get(key)!r}. "
-                "Refusing to resume with an inconsistent draft configuration."
-            )
+    validate_dspark_checkpoint_meta(saved_meta, expected_meta)
     state_dict = get_model_state_dict(draft_model)
     dcp.load(state_dict, checkpoint_id=draft_dir)
     set_model_state_dict(draft_model, state_dict)
