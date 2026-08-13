@@ -50,3 +50,5 @@ code_snapshots*/
 .humanize*
 smoke_logs/
 .claude/settings.local.json
+tests/unit/unit_results.json
+tests/unit/unit_results/
