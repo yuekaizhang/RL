@@ -16,6 +16,15 @@ checkpointing:
   checkpoint_must_save_by: 00:03:45:00
 policy:
   model_name: Qwen/Qwen3-8B
+  tokenizer:
+    name: Qwen/Qwen3-8B
+    # Qwen3's thinking mode exceeds the 2048-token generation budget on math
+    # problems: at validation every response hit the cap mid-reasoning and
+    # scored 0, and most training rollouts were truncated (then dropped by
+    # overlong filtering). Non-thinking answers fit the budget. Revisit when
+    # the dspark path supports activation checkpointing and an 8k budget.
+    chat_template_kwargs:
+      enable_thinking: false
   train_micro_batch_size: 1
   logprob_batch_size: 1
   max_total_sequence_length: 4096
