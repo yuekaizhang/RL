@@ -181,6 +181,13 @@ def extract_logits(
         return outputs.logits
 
 
+def will_scale_temperature(
+    sampling_params: Optional[TrainingSamplingParams],
+) -> bool:
+    """Whether apply_temperature_scaling will mutate the logits in place."""
+    return sampling_params is not None and sampling_params.temperature != 1.0
+
+
 def apply_temperature_scaling(
     logits: torch.Tensor, sampling_params: Optional[TrainingSamplingParams]
 ) -> torch.Tensor:
@@ -193,7 +200,7 @@ def apply_temperature_scaling(
     Returns:
         torch.Tensor: Temperature-scaled logits
     """
-    if sampling_params is not None and sampling_params.temperature != 1.0:
+    if will_scale_temperature(sampling_params):
         logits.div_(sampling_params.temperature)
     return logits
 
@@ -376,13 +383,10 @@ def forward_with_post_processing_fn(
     # (in-place) temperature scaling below mutates the tensor.
     if (
         isinstance(post_processing_fn, LossPostProcessor)
-        and getattr(post_processing_fn, "dspark_runtime", None) is not None
+        and post_processing_fn.dspark_runtime is not None
     ):
-        will_scale_inplace = (
-            sampling_params is not None and sampling_params.temperature != 1.0
-        )
         post_processing_fn.dspark_runtime.stash_teacher_logits(
-            logits, will_scale_inplace
+            logits, will_scale_inplace=will_scale_temperature(sampling_params)
         )
 
     # Apply temperature scaling only for sampling-oriented post-processors

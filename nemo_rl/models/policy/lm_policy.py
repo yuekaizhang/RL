@@ -117,13 +117,14 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
 
         megatron_enable = bool(config.get("megatron_cfg", {}).get("enabled", False))
         dtensor_enable = bool(config.get("dtensor_cfg", {}).get("enabled", False))
-        draft_enabled = bool(config.get("draft", {}).get("enabled", False))
+        draft_cfg = config.get("draft", {})
+        draft_enabled = bool(draft_cfg.get("enabled", False))
         if megatron_enable and dtensor_enable:
             raise ValueError(
                 "Configure either Megatron (policy.megatron_cfg.enabled=true) or "
                 "DTensor (policy.dtensor_cfg.enabled=true), not both."
             )
-        draft_algo = config.get("draft", {}).get("algo", "eagle3")
+        draft_algo = draft_cfg.get("algo", "eagle3")
         if draft_enabled and draft_algo not in ("eagle3", "dspark"):
             raise ValueError(
                 f"policy.draft.algo must be one of {{'eagle3', 'dspark'}} when "
@@ -143,7 +144,7 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
                     "policy.draft.algo=dspark requires the DTensor v2 backend "
                     "(policy.dtensor_cfg.enabled=true and policy.dtensor_cfg._v2=true)."
                 )
-            if config.get("draft", {}).get("model_name") is None:
+            if draft_cfg.get("model_name") is None:
                 raise ValueError(
                     "policy.draft.algo=dspark requires a pretrained DSpark checkpoint; "
                     "set policy.draft.model_name (from-scratch draft init is not supported)."

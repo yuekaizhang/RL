@@ -28,11 +28,11 @@ from typing import Any, Optional
 import torch
 import torch.distributed as dist
 from torch import nn
-from torch.distributed.tensor import DTensor
 
 from nemo_rl.models.automodel.draft.common import DSparkForwardOutput
 from nemo_rl.models.automodel.draft.draft_qwen3 import Qwen3DSparkModel
 from nemo_rl.models.automodel.draft.loss import compute_dspark_loss
+from nemo_rl.models.dtensor.parallelize import get_grad_norm, to_local_if_dtensor
 
 DSPARK_REQUIRED_CONFIG_FIELDS = ("block_size", "target_layer_ids", "mask_token_id")
 DRAFT_CHECKPOINT_DIRNAME = "draft"
@@ -132,27 +132,24 @@ def build_dspark_draft_model(
     return draft_model
 
 
-def _resolve_layers_and_norm(
+def _resolve_layers(
     policy_model: nn.Module,
-) -> tuple[nn.Module, nn.ModuleList, nn.Module]:
-    """Locate the decoder backbone (embedding owner), layer list, and final norm."""
+) -> tuple[nn.Module, nn.ModuleList]:
+    """Locate the decoder backbone (embedding owner) and its layer list."""
     base = getattr(policy_model, "model", policy_model)
     layers = getattr(base, "layers", None)
-    norm = getattr(base, "norm", None)
-    if layers is None or norm is None:
+    if layers is None:
         raise ValueError(
-            "DSpark hidden capture could not locate `.layers` / `.norm` on the "
-            f"policy model (searched {type(base).__name__}). Only HF-style decoder "
+            "DSpark hidden capture could not locate `.layers` on the policy "
+            f"model (searched {type(base).__name__}). Only HF-style decoder "
             "stacks are supported for DSpark co-training."
         )
-    return base, layers, norm
+    return base, layers
 
 
 def _hook_output_tensor(output: Any) -> torch.Tensor:
     hidden = output[0] if isinstance(output, tuple) else output
-    if isinstance(hidden, DTensor):
-        hidden = hidden.to_local()
-    return hidden.detach()
+    return to_local_if_dtensor(hidden).detach()
 
 
 class DSparkHiddenCapture:
@@ -165,7 +162,7 @@ class DSparkHiddenCapture:
 
     def __init__(self, policy_model: nn.Module, target_layer_ids: list[int]):
         self.target_layer_ids = [int(i) for i in target_layer_ids]
-        base, layers, norm = _resolve_layers_and_norm(policy_model)
+        base, layers = _resolve_layers(policy_model)
         num_layers = len(layers)
         for layer_id in self.target_layer_ids:
             if layer_id != -1 and not (0 <= layer_id < num_layers):
@@ -185,10 +182,8 @@ class DSparkHiddenCapture:
                 self._modules_by_id[layer_id] = embed
             else:
                 self._modules_by_id[layer_id] = layers[layer_id]
-        self._norm_module = norm
         self._handles: list[Any] = []
         self._captured: dict[int, torch.Tensor] = {}
-        self._last_hidden: Optional[torch.Tensor] = None
 
     @property
     def active(self) -> bool:
@@ -204,14 +199,10 @@ class DSparkHiddenCapture:
 
             return hook
 
-        def norm_hook(_module: nn.Module, _inputs: Any, output: Any) -> None:
-            self._last_hidden = _hook_output_tensor(output)
-
         for layer_id, module in self._modules_by_id.items():
             self._handles.append(
                 module.register_forward_hook(make_layer_hook(layer_id))
             )
-        self._handles.append(self._norm_module.register_forward_hook(norm_hook))
 
     def deactivate(self) -> None:
         for handle in self._handles:
@@ -221,21 +212,17 @@ class DSparkHiddenCapture:
 
     def clear(self) -> None:
         self._captured = {}
-        self._last_hidden = None
 
-    def collect(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def collect(self) -> torch.Tensor:
+        """Concatenated target hidden states captured by the layer hooks."""
         missing = [i for i in self.target_layer_ids if i not in self._captured]
-        if missing or self._last_hidden is None:
+        if missing:
             raise RuntimeError(
                 "DSpark hidden capture did not observe the policy forward "
-                f"(missing layer ids {missing}, last_hidden captured: "
-                f"{self._last_hidden is not None}). The capture hooks must be "
+                f"(missing layer ids {missing}). The capture hooks must be "
                 "active during the training forward."
             )
-        target_hidden_states = torch.cat(
-            [self._captured[i] for i in self.target_layer_ids], dim=-1
-        )
-        return target_hidden_states, self._last_hidden
+        return torch.cat([self._captured[i] for i in self.target_layer_ids], dim=-1)
 
 
 class DSparkRuntime:
@@ -247,11 +234,13 @@ class DSparkRuntime:
         dspark_options: dict[str, Any],
         loss_weight: float,
         dp_group: Optional[dist.ProcessGroup],
+        tp_group: Optional[dist.ProcessGroup] = None,
     ):
         self.draft_model = draft_model
         self.options = dspark_options
         self.loss_weight = float(loss_weight)
         self.dp_group = dp_group
+        self.tp_group = tp_group
         self.capture: Optional[DSparkHiddenCapture] = None
         self._teacher_logits: Optional[torch.Tensor] = None
         self._num_microbatch_slots: int = 1
@@ -299,7 +288,7 @@ class DSparkRuntime:
                 "DSpark loss requested but no teacher logits were stashed for this "
                 "microbatch."
             )
-        target_hidden_states, _last_hidden = self.capture.collect()
+        target_hidden_states = self.capture.collect()
 
         input_ids = data_dict["input_ids"]
         loss_mask = data_dict["token_mask"].float()
@@ -340,7 +329,6 @@ class DSparkRuntime:
         microbatch-weighted mean rather than an exact token-weighted global
         ratio, which is sufficient for trend monitoring.
         """
-        eps = 1e-6
         metrics: dict[str, float] = {
             "draft_loss": float(terms["loss"].item()),
             "draft_ce_loss": float(terms["ce_loss"].item()),
@@ -349,30 +337,26 @@ class DSparkRuntime:
         }
         tau_den = float(terms["tau_den"].item())
         metrics["draft_tau"] = (
-            float(terms["tau_num"].item()) / (tau_den + eps) if tau_den > 0 else 0.0
+            float(terms["tau_num"].item()) / tau_den if tau_den > 0 else 0.0
         )
-        pos_num = terms["accept_rate_per_pos_num"]
-        pos_den = terms["accept_rate_per_pos_den"]
-        for k in range(pos_num.shape[0]):
-            den_k = float(pos_den[k].item())
-            metrics[f"draft_accept_rate@{k + 1}"] = (
-                float(pos_num[k].item()) / (den_k + eps) if den_k > 0 else 0.0
-            )
+        # One host transfer per vector instead of one sync per position.
+        pos_nums = terms["accept_rate_per_pos_num"].tolist()
+        pos_dens = terms["accept_rate_per_pos_den"].tolist()
+        for k, (num_k, den_k) in enumerate(zip(pos_nums, pos_dens)):
+            metrics[f"draft_accept_rate@{k + 1}"] = num_k / den_k if den_k > 0 else 0.0
         return metrics
 
     @torch.no_grad()
     def compute_draft_grad_norm(self) -> float:
         """Global L2 norm of the draft's gradients (reporting only; clipping is global)."""
-        local_sq = torch.zeros((), device="cuda", dtype=torch.float32)
-        for param in self.draft_model.parameters():
-            grad = param.grad
-            if grad is None:
-                continue
-            local = grad.to_local() if isinstance(grad, DTensor) else grad
-            local_sq += local.float().pow(2).sum()
-        if dist.is_initialized() and dist.get_world_size(self.dp_group) > 1:
-            dist.all_reduce(local_sq, op=dist.ReduceOp.SUM, group=self.dp_group)
-        return float(local_sq.sqrt().item())
+        return float(
+            get_grad_norm(
+                list(self.draft_model.parameters()),
+                dp_cp_group=self.dp_group,
+                tp_group=self.tp_group,
+                norm_type=2.0,
+            )
+        )
 
 
 @contextlib.contextmanager
@@ -434,9 +418,9 @@ def draft_checkpoint_dir(weights_path: str) -> str:
     mis-detect the safetensors policy checkpoint as DCP after seeing the
     draft's ``.distcp`` files.
     """
+    # abspath normalizes trailing slashes before dirname takes the parent.
     return os.path.join(
-        os.path.dirname(os.path.abspath(os.path.normpath(weights_path))),
-        DRAFT_CHECKPOINT_DIRNAME,
+        os.path.dirname(os.path.abspath(weights_path)), DRAFT_CHECKPOINT_DIRNAME
     )
 
 
@@ -509,12 +493,35 @@ def load_draft_checkpoint(
     set_model_state_dict(draft_model, state_dict)
 
 
-def draft_params_generator(draft_model: Qwen3DSparkModel, target_dtype: torch.dtype):
-    """Yield the draft's full weights as (draft.<hf_name>, tensor) for refit."""
-    for name, tensor in draft_model.state_dict().items():
-        full_tensor = tensor.full_tensor() if isinstance(tensor, DTensor) else tensor
-        yield (
-            f"draft.{name}",
-            full_tensor.to(target_dtype, non_blocking=True).contiguous(),
+def load_dspark_checkpoint(
+    checkpoint_manager: Any,
+    model: nn.Module,
+    draft_model: Qwen3DSparkModel,
+    composite_model: nn.Module,
+    optimizer: Optional[torch.optim.Optimizer],
+    scheduler: Any,
+    weights_path: str,
+    optimizer_path: Optional[str],
+    model_name: str,
+) -> None:
+    """Load a dspark checkpoint with the composite-optimizer pairing rule.
+
+    Policy weights load exactly as without a draft; draft weights load from
+    the sibling draft entry with validated metadata; optimizer state pairs
+    with the composite module whose param groups span policy + draft. This is
+    the single home of that pairing invariant for both resume-at-setup and
+    mid-run checkpoint loads.
+    """
+    checkpoint_manager.load_checkpoint(model=model, weights_path=weights_path)
+    load_draft_checkpoint(
+        draft_model,
+        weights_path,
+        expected_meta=dspark_meta_record(draft_model, model_name, optimizer),
+    )
+    if optimizer_path and optimizer is not None:
+        checkpoint_manager.checkpointer.load_optimizer(
+            optimizer=optimizer,
+            model=composite_model,
+            weights_path=optimizer_path,
+            scheduler=scheduler,
         )
-        del full_tensor

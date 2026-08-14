@@ -365,6 +365,7 @@ class DTensorPolicyWorkerV2Impl(
                 dspark_options=draft_cfg["dspark"],
                 loss_weight=float(draft_cfg.get("loss_weight", 1.0)),
                 dp_group=self.dp_mesh.get_group(),
+                tp_group=self.tp_mesh.get_group(),
             )
             self.dspark_runtime.attach_capture(self.model)
 
@@ -551,14 +552,20 @@ class DTensorPolicyWorkerV2Impl(
                     # Slot count = DP-max of valid microbatch counts, i.e. the
                     # padded (dummy-including) count every rank actually runs.
                     # Used to average the per-slot DSpark losses so the summed
-                    # backward keeps a global-mean gradient scale.
-                    mb_slots = torch.tensor(iterator_len, device="cuda")
-                    torch.distributed.all_reduce(
-                        mb_slots,
-                        op=torch.distributed.ReduceOp.MAX,
-                        group=self.dp_mesh.get_group(),
-                    )
-                    dspark_runtime.begin_global_batch(int(mb_slots.item()))
+                    # backward keeps a global-mean gradient scale. Counts can
+                    # differ across ranks only under dynamic batching (packing
+                    # is rejected for dspark); otherwise skip the collective.
+                    if self.cfg["dynamic_batching"]["enabled"]:
+                        mb_slots_t = torch.tensor(iterator_len, device="cuda")
+                        torch.distributed.all_reduce(
+                            mb_slots_t,
+                            op=torch.distributed.ReduceOp.MAX,
+                            group=self.dp_mesh.get_group(),
+                        )
+                        mb_slots = int(mb_slots_t.item())
+                    else:
+                        mb_slots = iterator_len
+                    dspark_runtime.begin_global_batch(mb_slots)
 
                 # Use automodel_forward_backward for the training loop
                 mb_results = automodel_forward_backward(
@@ -1179,11 +1186,13 @@ class DTensorPolicyWorkerV2Impl(
         gen = dtensor_params_generator(self.model, self.dtype)
         if self.draft_model is None:
             return gen
-        from nemo_rl.models.automodel.draft.integration import draft_params_generator
-
-        return itertools.chain(
-            gen, draft_params_generator(self.draft_model, self.dtype)
+        # The draft is a plain HF module (no LoRA, no state-dict adapter), so
+        # the shared generator's merge/adapt steps are no-ops for it.
+        draft_gen = (
+            (f"draft.{name}", tensor)
+            for name, tensor in dtensor_params_generator(self.draft_model, self.dtype)
         )
+        return itertools.chain(gen, draft_gen)
 
     @torch.no_grad()
     def calibrate_qkv_fp8_scales(
@@ -1422,27 +1431,28 @@ class DTensorPolicyWorkerV2Impl(
 
         the optimizer states are saved only if `optimizer` and `optimizer_path` are provided.
         """
-        if self.draft_model is not None:
+        # With a draft, the optimizer state is saved separately below, paired
+        # with the composite module whose param groups span policy + draft
+        # (same pairing used at load); policy weights save identically either way.
+        has_draft = self.draft_model is not None
+        self.checkpoint_manager.save_checkpoint(
+            model=self.model,
+            weights_path=weights_path,
+            optimizer=None if has_draft else self.optimizer,
+            optimizer_path=None if has_draft else optimizer_path,
+            scheduler=None if has_draft else self.scheduler,
+            tokenizer=self.tokenizer if tokenizer_path else None,
+            tokenizer_path=tokenizer_path,
+            checkpointing_cfg=checkpointing_cfg,
+            lora_enabled=self.lora_enabled,
+            peft_config=self.peft_config,
+        )
+        if has_draft:
             from nemo_rl.models.automodel.draft.integration import (
                 dspark_meta_record,
                 save_draft_checkpoint,
             )
 
-            # Policy weights save exactly as without a draft; the optimizer
-            # state pairs with the composite module whose param groups span
-            # policy + draft (same pairing used at load).
-            self.checkpoint_manager.save_checkpoint(
-                model=self.model,
-                weights_path=weights_path,
-                optimizer=None,
-                optimizer_path=None,
-                scheduler=None,
-                tokenizer=self.tokenizer if tokenizer_path else None,
-                tokenizer_path=tokenizer_path,
-                checkpointing_cfg=checkpointing_cfg,
-                lora_enabled=self.lora_enabled,
-                peft_config=self.peft_config,
-            )
             if optimizer_path and self.optimizer is not None:
                 self.checkpoint_manager.checkpointer.save_optimizer(
                     optimizer=self.optimizer,
@@ -1459,19 +1469,6 @@ class DTensorPolicyWorkerV2Impl(
                     self.optimizer,
                 ),
             )
-        else:
-            self.checkpoint_manager.save_checkpoint(
-                model=self.model,
-                weights_path=weights_path,
-                optimizer=self.optimizer,
-                optimizer_path=optimizer_path,
-                scheduler=self.scheduler,
-                tokenizer=self.tokenizer if tokenizer_path else None,
-                tokenizer_path=tokenizer_path,
-                checkpointing_cfg=checkpointing_cfg,
-                lora_enabled=self.lora_enabled,
-                peft_config=self.peft_config,
-            )
 
     def load_checkpoint(
         self,
@@ -1481,30 +1478,20 @@ class DTensorPolicyWorkerV2Impl(
         """Load a checkpoint into the model using Automodel Checkpointer."""
         if self.draft_model is not None:
             from nemo_rl.models.automodel.draft.integration import (
-                dspark_meta_record,
-                load_draft_checkpoint,
+                load_dspark_checkpoint,
             )
 
-            self.checkpoint_manager.load_checkpoint(
+            load_dspark_checkpoint(
+                self.checkpoint_manager,
                 model=self.model,
+                draft_model=self.draft_model,
+                composite_model=self.composite_model,
+                optimizer=self.optimizer,
+                scheduler=self.scheduler,
                 weights_path=weights_path,
+                optimizer_path=optimizer_path,
+                model_name=self.cfg["draft"]["model_name"],
             )
-            load_draft_checkpoint(
-                self.draft_model,
-                weights_path,
-                expected_meta=dspark_meta_record(
-                    self.draft_model,
-                    self.cfg["draft"]["model_name"],
-                    self.optimizer,
-                ),
-            )
-            if optimizer_path and self.optimizer is not None:
-                self.checkpoint_manager.checkpointer.load_optimizer(
-                    optimizer=self.optimizer,
-                    model=self.composite_model,
-                    weights_path=optimizer_path,
-                    scheduler=self.scheduler,
-                )
         else:
             self.checkpoint_manager.load_checkpoint(
                 model=self.model,

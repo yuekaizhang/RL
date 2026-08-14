@@ -587,9 +587,7 @@ class VllmInternalWorkerExtension:
         """
         if self._mtp_drafter_from_disk:
             return False
-        spec_config = getattr(self.model_runner.vllm_config, "speculative_config", None)
-        method = getattr(spec_config, "method", None) if spec_config else None
-        if method not in ("deepseek_mtp", "mtp"):
+        if self._speculative_method() not in ("deepseek_mtp", "mtp"):
             return False
         return self._get_drafter_model() is not None
 

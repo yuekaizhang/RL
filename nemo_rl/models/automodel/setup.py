@@ -903,30 +903,20 @@ def setup_model_and_optimizer(
     if weights_path:
         if draft_model is not None:
             from nemo_rl.models.automodel.draft.integration import (
-                dspark_meta_record,
-                load_draft_checkpoint,
+                load_dspark_checkpoint,
             )
 
-            # Policy weights load as usual; the optimizer state pairs with the
-            # composite module because its param groups span policy + draft.
-            checkpoint_manager.load_checkpoint(
+            load_dspark_checkpoint(
+                checkpoint_manager,
                 model=model,
+                draft_model=draft_model,
+                composite_model=composite_model,
+                optimizer=optimizer,
+                scheduler=scheduler,
                 weights_path=weights_path,
+                optimizer_path=optimizer_path,
+                model_name=draft_cfg["model_name"],
             )
-            load_draft_checkpoint(
-                draft_model,
-                weights_path,
-                expected_meta=dspark_meta_record(
-                    draft_model, draft_cfg["model_name"], optimizer
-                ),
-            )
-            if optimizer_path and optimizer is not None:
-                checkpoint_manager.checkpointer.load_optimizer(
-                    optimizer=optimizer,
-                    model=composite_model,
-                    weights_path=optimizer_path,
-                    scheduler=scheduler,
-                )
         else:
             checkpoint_manager.load_checkpoint(
                 model=model,
