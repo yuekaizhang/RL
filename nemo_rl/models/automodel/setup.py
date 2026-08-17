@@ -846,7 +846,10 @@ def setup_model_and_optimizer(
         if draft_model is not None:
             # Named [policy, draft] param groups in stable order; the layout
             # record saved with the checkpoint validates names, order, and
-            # per-group param counts on resume (hard error on mismatch).
+            # per-group param counts on resume (hard error on mismatch). The
+            # draft group carries its own learning rate: the policy's RL lr is
+            # orders of magnitude below the draft's native training lr, and a
+            # shared lr leaves the draft unable to track policy drift.
             optimizer = optimizer_cls(
                 [
                     {
@@ -858,6 +861,7 @@ def setup_model_and_optimizer(
                         "params": [
                             p for p in draft_model.parameters() if p.requires_grad
                         ],
+                        "lr": float(draft_cfg["dspark"]["learning_rate"]),
                     },
                 ],
                 **optimizer_kwargs,

@@ -603,16 +603,13 @@ class DTensorPolicyWorkerV2Impl(
 
                 grad_norm: Optional[float | torch.Tensor] = None
                 if not eval_mode:
-                    # The DSpark draft's gradients are scaled and clipped
-                    # globally together with the policy's.
-                    clip_modules = (
-                        [self.model]
-                        if self.draft_model is None
-                        else [self.model, self.draft_model]
-                    )
+                    # The policy is clipped on its own (Megatron-path parity):
+                    # a shared global clip let the draft's larger gradients
+                    # scale down the policy's updates on every step. The draft
+                    # is clipped separately below.
                     grad_norm = scale_grads_and_clip_grad_norm(
                         self.max_grad_norm,
-                        clip_modules,
+                        [self.model],
                         norm_type=2.0,
                         pp_enabled=False,
                         device_mesh=self.device_mesh,
@@ -631,10 +628,24 @@ class DTensorPolicyWorkerV2Impl(
                     )
                     warn_if_inf_grad_norm(grad_norm)
 
-                    # Reporting-only: the draft's share of the (already scaled
-                    # and clipped) gradients that the optimizer step consumes.
+                    # Independent draft clip with the same max norm; the
+                    # returned pre-clip norm doubles as the reported metric.
                     if dspark_runtime is not None:
-                        draft_grad_norm = dspark_runtime.compute_draft_grad_norm()
+                        draft_grad_norm = float(
+                            scale_grads_and_clip_grad_norm(
+                                self.max_grad_norm,
+                                [self.draft_model],
+                                norm_type=2.0,
+                                pp_enabled=False,
+                                device_mesh=self.device_mesh,
+                                moe_mesh=None,
+                                ep_axis_name=None,
+                                pp_axis_name=None,
+                                foreach=True,
+                                num_label_tokens=1,
+                                dp_group_size=self.dp_size * self.cp_size,
+                            )
+                        )
 
                     # Update parameters and the non-gradient MoE routing bias.
                     self.optimizer.step()

@@ -21,7 +21,11 @@ policy:
       # leaves only ~2 GiB headroom on 80 GiB: 512 anchors OOMs by gigabytes,
       # 128 by a few hundred MiB. 64 anchors fits and still supervises ~450
       # block positions per sequence each step.
-      num_anchors: 64
+      num_anchors: 32
+      # Draft-group lr: the policy's 1e-6 RL lr is ~600x below dspark's native
+      # training lr, leaving the draft unable to track policy drift (observed
+      # as monotonic tau decay). 1e-4 sits between the two.
+      learning_rate: 1.0e-04
       ce_loss_alpha: 0.1
       l1_loss_alpha: 0.9
       confidence_loss_alpha: 1.0

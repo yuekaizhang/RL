@@ -467,6 +467,11 @@ class DSparkDraftOptions(TypedDict):
     # Anchor blocks sampled per sequence each training forward (capped by the
     # number of valid response positions).
     num_anchors: int
+    # Learning rate for the draft's optimizer param group. The draft needs a
+    # much higher rate than the policy's RL lr to track the policy's
+    # distribution drift (dspark pretraining used 6e-4; the policy trains at
+    # ~1e-6).
+    learning_rate: float
     # Cross-entropy weight against the rollout tokens.
     ce_loss_alpha: float
     # Total-variation distillation weight against the policy's raw logits.

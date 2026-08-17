@@ -32,7 +32,7 @@ from torch import nn
 from nemo_rl.models.automodel.draft.common import DSparkForwardOutput
 from nemo_rl.models.automodel.draft.draft_qwen3 import Qwen3DSparkModel
 from nemo_rl.models.automodel.draft.loss import compute_dspark_loss
-from nemo_rl.models.dtensor.parallelize import get_grad_norm, to_local_if_dtensor
+from nemo_rl.models.dtensor.parallelize import to_local_if_dtensor
 
 DSPARK_REQUIRED_CONFIG_FIELDS = ("block_size", "target_layer_ids", "mask_token_id")
 DRAFT_CHECKPOINT_DIRNAME = "draft"
@@ -345,18 +345,6 @@ class DSparkRuntime:
         for k, (num_k, den_k) in enumerate(zip(pos_nums, pos_dens)):
             metrics[f"draft_accept_rate@{k + 1}"] = num_k / den_k if den_k > 0 else 0.0
         return metrics
-
-    @torch.no_grad()
-    def compute_draft_grad_norm(self) -> float:
-        """Global L2 norm of the draft's gradients (reporting only; clipping is global)."""
-        return float(
-            get_grad_norm(
-                list(self.draft_model.parameters()),
-                dp_cp_group=self.dp_group,
-                tp_group=self.tp_group,
-                norm_type=2.0,
-            )
-        )
 
 
 @contextlib.contextmanager

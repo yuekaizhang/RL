@@ -308,6 +308,9 @@ policy:
     # head layout) come from the draft checkpoint's config.json.
     dspark:
       num_anchors: 512
+      # Draft param-group lr; must far exceed the policy RL lr so the draft
+      # tracks policy drift (pretraining used 6e-4).
+      learning_rate: 1.0e-04
       ce_loss_alpha: 0.1
       l1_loss_alpha: 0.9
       confidence_loss_alpha: 1.0
