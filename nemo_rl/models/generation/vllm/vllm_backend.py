@@ -13,6 +13,7 @@
 # limitations under the License.
 import gc
 import logging
+import os
 import re
 import socket
 from collections.abc import Callable, Iterable, Iterator, Sequence
@@ -58,6 +59,40 @@ except ImportError:
 
 WeightUpdateTransport = Literal["ipc", "collective"]
 WeightUpdateFinalizer = Callable[[], None]
+
+# Env flag that requests disable_dspark_draft_module_sharing() at import time in
+# every process that resolves this module (the driver actor and any spawned
+# vLLM executor workers, which import it for worker_extension_cls before
+# loading the model).
+DSPARK_DISABLE_DRAFT_MODULE_SHARING_ENV = "NRL_DSPARK_DISABLE_DRAFT_MODULE_SHARING"
+
+
+def disable_dspark_draft_module_sharing() -> None:
+    """Keep the DSpark drafter's embed_tokens/lm_head separate from the target's.
+
+    The pinned vLLM's ``load_dspark_model`` aliases the drafter's embed_tokens
+    and lm_head modules to the target model's whenever the drafter's
+    ``load_weights`` has not marked them as owned — which is always the case
+    under ``load_format="dummy"``, where no checkpoint weights are read at
+    startup. With DSpark co-training the refit stream carries trained
+    ``draft.embed_tokens`` / ``draft.lm_head`` weights, and loading them through
+    the aliased modules silently replaces the POLICY model's serving embed and
+    lm_head with the draft's. Forcing ``_should_share`` to False makes the
+    drafter keep the modules it built in ``__init__``; refit fills them before
+    the first generation, and CUDA graphs capture drafter-owned storage.
+
+    Must run before engine creation (drafter load and CUDA-graph capture).
+    """
+    from vllm.v1.worker.gpu.spec_decode.dspark import utils as dspark_utils
+
+    def _never_share(*args: Any, **kwargs: Any) -> bool:
+        return False
+
+    dspark_utils._should_share = _never_share
+
+
+if os.environ.get(DSPARK_DISABLE_DRAFT_MODULE_SHARING_ENV) == "1":
+    disable_dspark_draft_module_sharing()
 
 # Incoming DSpark stream keys the drafter's loader intentionally skips
 # (mask_embedding is a placeholder param, the confidence head is not wired
@@ -569,8 +604,61 @@ class VllmInternalWorkerExtension:
                 "[draft] Received draft weights but vLLM drafter is unavailable; skipping draft update."
             )
             return
+        if self._speculative_method() == "dspark":
+            self._assert_dspark_drafter_owns_modules(draft_model, draft_weights)
         draft_weights = self._trim_vocab_padding(draft_model, draft_weights)
         draft_model.load_weights(weights=draft_weights)
+
+    def _assert_dspark_drafter_owns_modules(
+        self, draft_model: Any, draft_weights: list[tuple[str, torch.Tensor]]
+    ) -> None:
+        """Refuse to load draft embed/lm_head through target-shared modules.
+
+        vLLM's ``load_dspark_model`` may alias the drafter's embed_tokens and
+        lm_head to the target model's modules as a weight-sharing optimization;
+        loading refit draft weights through such an alias would overwrite the
+        policy's serving weights with the draft's (see
+        ``disable_dspark_draft_module_sharing``). Guard every refit so any path
+        that reintroduces the sharing fails loudly instead of silently
+        corrupting generation.
+        """
+        target_model = self.model_runner.model
+        target_lm = (
+            target_model.get_language_model()
+            if hasattr(target_model, "get_language_model")
+            else target_model
+        )
+        refits_embed = any("embed_tokens" in name for name, _ in draft_weights)
+        refits_lm_head = any("lm_head" in name for name, _ in draft_weights)
+
+        def _shares_weight(draft_module: Any, target_module: Any) -> bool:
+            return (
+                draft_module is not None
+                and target_module is not None
+                and draft_module.weight.data_ptr() == target_module.weight.data_ptr()
+            )
+
+        shared = []
+        if refits_embed and _shares_weight(
+            getattr(getattr(draft_model, "model", None), "embed_tokens", None),
+            getattr(getattr(target_lm, "model", None), "embed_tokens", None),
+        ):
+            shared.append("embed_tokens")
+        if refits_lm_head and _shares_weight(
+            getattr(draft_model, "lm_head", None),
+            getattr(target_lm, "lm_head", None),
+        ):
+            shared.append("lm_head")
+        if shared:
+            raise RuntimeError(
+                "[draft] The DSpark drafter's "
+                + "/".join(shared)
+                + " share storage with the target model; loading refit draft "
+                "weights through the alias would overwrite the policy's serving "
+                "weights. Ensure disable_dspark_draft_module_sharing() ran "
+                "before engine creation "
+                f"({DSPARK_DISABLE_DRAFT_MODULE_SHARING_ENV}=1)."
+            )
 
     def _mtp_drafter_refit_enabled(self) -> bool:
         """Whether MTP drafter weights should be refreshed from the refit stream.

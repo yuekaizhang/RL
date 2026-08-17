@@ -654,3 +654,95 @@ def test_dspark_static_drafter_manifest_without_draft_keys_passes(monkeypatch):
     info = {"model.weight": ((4, 4), torch.bfloat16)}
     ext.prepare_refit_info(info)
     assert ext.state_dict_info is info
+
+
+@pytest.mark.vllm
+def test_dspark_alias_guard_rejects_target_shared_modules():
+    from nemo_rl.models.generation.vllm.vllm_backend import (
+        VllmInternalWorkerExtension,
+    )
+
+    ext = VllmInternalWorkerExtension.__new__(VllmInternalWorkerExtension)
+    shared_embed = SimpleNamespace(weight=torch.zeros(4, 2))
+    shared_head = SimpleNamespace(weight=torch.zeros(4, 2))
+    ext.model_runner = SimpleNamespace(
+        model=SimpleNamespace(
+            model=SimpleNamespace(embed_tokens=shared_embed), lm_head=shared_head
+        )
+    )
+    draft_model = SimpleNamespace(
+        model=SimpleNamespace(embed_tokens=shared_embed), lm_head=shared_head
+    )
+    weights = [
+        ("model.embed_tokens.weight", torch.zeros(4, 2)),
+        ("lm_head.weight", torch.zeros(4, 2)),
+    ]
+    with pytest.raises(RuntimeError, match="share storage"):
+        ext._assert_dspark_drafter_owns_modules(draft_model, weights)
+
+
+@pytest.mark.vllm
+def test_dspark_alias_guard_accepts_drafter_owned_modules():
+    from nemo_rl.models.generation.vllm.vllm_backend import (
+        VllmInternalWorkerExtension,
+    )
+
+    ext = VllmInternalWorkerExtension.__new__(VllmInternalWorkerExtension)
+    ext.model_runner = SimpleNamespace(
+        model=SimpleNamespace(
+            model=SimpleNamespace(
+                embed_tokens=SimpleNamespace(weight=torch.zeros(4, 2))
+            ),
+            lm_head=SimpleNamespace(weight=torch.zeros(4, 2)),
+        )
+    )
+    draft_model = SimpleNamespace(
+        model=SimpleNamespace(embed_tokens=SimpleNamespace(weight=torch.zeros(4, 2))),
+        lm_head=SimpleNamespace(weight=torch.zeros(4, 2)),
+    )
+    weights = [
+        ("model.embed_tokens.weight", torch.zeros(4, 2)),
+        ("lm_head.weight", torch.zeros(4, 2)),
+    ]
+    ext._assert_dspark_drafter_owns_modules(draft_model, weights)
+
+
+@pytest.mark.vllm
+def test_dspark_alias_guard_ignores_shared_modules_not_in_refit():
+    from nemo_rl.models.generation.vllm.vllm_backend import (
+        VllmInternalWorkerExtension,
+    )
+
+    ext = VllmInternalWorkerExtension.__new__(VllmInternalWorkerExtension)
+    shared_embed = SimpleNamespace(weight=torch.zeros(4, 2))
+    shared_head = SimpleNamespace(weight=torch.zeros(4, 2))
+    ext.model_runner = SimpleNamespace(
+        model=SimpleNamespace(
+            model=SimpleNamespace(embed_tokens=shared_embed), lm_head=shared_head
+        )
+    )
+    draft_model = SimpleNamespace(
+        model=SimpleNamespace(embed_tokens=shared_embed), lm_head=shared_head
+    )
+    # A static-drafter-style refit without embed/lm_head keys may keep sharing.
+    weights = [("model.fc.weight", torch.zeros(4, 2))]
+    ext._assert_dspark_drafter_owns_modules(draft_model, weights)
+
+
+@pytest.mark.vllm
+def test_disable_dspark_draft_module_sharing_forces_ownership():
+    from vllm.v1.worker.gpu.spec_decode.dspark import utils as dspark_utils
+
+    from nemo_rl.models.generation.vllm.vllm_backend import (
+        disable_dspark_draft_module_sharing,
+    )
+
+    original_should_share = dspark_utils._should_share
+    try:
+        disable_dspark_draft_module_sharing()
+        assert (
+            dspark_utils._should_share(None, "has_own_embed_tokens", None, None)
+            is False
+        )
+    finally:
+        dspark_utils._should_share = original_should_share
