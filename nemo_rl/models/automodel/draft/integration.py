@@ -28,11 +28,11 @@ from typing import Any, Optional
 import torch
 import torch.distributed as dist
 from torch import nn
+from torch.distributed.tensor import DTensor
 
 from nemo_rl.models.automodel.draft.common import DSparkForwardOutput
 from nemo_rl.models.automodel.draft.draft_qwen3 import Qwen3DSparkModel
 from nemo_rl.models.automodel.draft.loss import compute_dspark_loss
-from nemo_rl.models.dtensor.parallelize import to_local_if_dtensor
 
 DSPARK_REQUIRED_CONFIG_FIELDS = ("block_size", "target_layer_ids", "mask_token_id")
 DRAFT_CHECKPOINT_DIRNAME = "draft"
@@ -149,19 +149,30 @@ def _resolve_layers(
 
 def _hook_output_tensor(output: Any) -> torch.Tensor:
     hidden = output[0] if isinstance(output, tuple) else output
-    return to_local_if_dtensor(hidden).detach()
+    if isinstance(hidden, DTensor):
+        # Under TP the layer output can be sharded or partial; materialize the
+        # replicated full tensor (a no-op collective when already replicated).
+        if any(not p.is_replicate() for p in hidden.placements):
+            hidden = hidden.full_tensor()
+        else:
+            hidden = hidden.to_local()
+    return hidden.detach()
 
 
 class DSparkHiddenCapture:
     """Forward hooks capturing the policy's per-layer hiddens for the draft.
 
-    Registered only around the training forward; storage is last-write-wins so
-    a recomputed forward would simply overwrite with identical values. Captured
-    tensors are detached: the DSpark loss never backprops into the policy trunk.
+    Captured tensors are detached: the DSpark loss never backprops into the
+    policy trunk. The hooks are "armed" by a pre-forward hook on the policy
+    root and disarmed by ``collect()``: activation checkpointing replays layer
+    forwards during backward (after the loss consumed the capture), and the
+    disarmed hooks turn those replays into no-ops instead of re-running
+    capture work (and, under TP, its collectives).
     """
 
     def __init__(self, policy_model: nn.Module, target_layer_ids: list[int]):
         self.target_layer_ids = [int(i) for i in target_layer_ids]
+        self._policy_root = policy_model
         base, layers = _resolve_layers(policy_model)
         num_layers = len(layers)
         for layer_id in self.target_layer_ids:
@@ -184,6 +195,7 @@ class DSparkHiddenCapture:
                 self._modules_by_id[layer_id] = layers[layer_id]
         self._handles: list[Any] = []
         self._captured: dict[int, torch.Tensor] = {}
+        self._armed = False
 
     @property
     def active(self) -> bool:
@@ -193,12 +205,22 @@ class DSparkHiddenCapture:
         if self._handles:
             return
 
+        def arm_hook(_module: nn.Module, _args: Any, _kwargs: Any) -> None:
+            self._armed = True
+
         def make_layer_hook(layer_id: int):
             def hook(_module: nn.Module, _inputs: Any, output: Any) -> None:
-                self._captured[layer_id] = _hook_output_tensor(output)
+                if self._armed:
+                    self._captured[layer_id] = _hook_output_tensor(output)
 
             return hook
 
+        # The root pre-hook re-arms capture at each microbatch forward; the
+        # checkpointed backward replay calls only layer forwards, so capture
+        # stays disarmed there.
+        self._handles.append(
+            self._policy_root.register_forward_pre_hook(arm_hook, with_kwargs=True)
+        )
         for layer_id, module in self._modules_by_id.items():
             self._handles.append(
                 module.register_forward_hook(make_layer_hook(layer_id))
@@ -212,6 +234,7 @@ class DSparkHiddenCapture:
 
     def clear(self) -> None:
         self._captured = {}
+        self._armed = False
 
     def collect(self) -> torch.Tensor:
         """Concatenated target hidden states captured by the layer hooks."""
@@ -222,6 +245,7 @@ class DSparkHiddenCapture:
                 f"(missing layer ids {missing}). The capture hooks must be "
                 "active during the training forward."
             )
+        self._armed = False
         return torch.cat([self._captured[i] for i in self.target_layer_ids], dim=-1)
 
 
@@ -271,7 +295,19 @@ class DSparkRuntime:
 
         With temperature 1.0 no scaling happens and a detached view is exact and
         free; otherwise the in-place div would corrupt the view, so clone first.
+
+        Under TP the logits arrive as a vocab-sharded DTensor; it is stashed
+        as-is and gathered to the full vocab lazily in ``compute_loss`` so the
+        full-size tensor does not coexist with the policy-loss peak.
         """
+        if not isinstance(logits, DTensor) and self.tp_group is not None:
+            if dist.get_world_size(self.tp_group) > 1:
+                raise RuntimeError(
+                    "DSpark co-training with tensor_parallel_size > 1 expects the "
+                    "policy logits as a vocab-sharded DTensor, but got a plain "
+                    f"{type(logits).__name__}; a bare local shard cannot be "
+                    "gathered safely."
+                )
         raw = logits.detach()
         self._teacher_logits = raw.clone() if will_scale_inplace else raw
 
@@ -288,6 +324,10 @@ class DSparkRuntime:
                 "DSpark loss requested but no teacher logits were stashed for this "
                 "microbatch."
             )
+        if isinstance(teacher_logits, DTensor):
+            # Vocab-sharded under TP; the draft's teacher gather needs the full
+            # vocab dimension.
+            teacher_logits = teacher_logits.full_tensor()
         target_hidden_states = self.capture.collect()
 
         input_ids = data_dict["input_ids"]
