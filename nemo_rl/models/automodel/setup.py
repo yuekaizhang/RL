@@ -770,6 +770,23 @@ def setup_model_and_optimizer(
         **automodel_kwargs,
     )
 
+    # AUTOMODEL-WORKAROUND(cp-linear-attn-hooks): Automodel's infrastructure.py
+    # attaches the CP hooks (including attach_linear_attn_position_hooks) only
+    # when the model does NOT use TE attention, yet its capability validation
+    # requires backend.attn='te' for CP on hybrid linear-attn models (e.g.
+    # Qwen3.5/3.6-MoE gated-delta-net). Without the hook the linear-attn layers
+    # never receive position_ids under CP and raise at the first forward.
+    # The hook is idempotent (_linear_attn_pos_hook_registered guard) and a
+    # no-op for models without linear_attn modules. Remove once Automodel
+    # attaches it for the TE-attention CP path too.
+    if cp_size > 1:
+        from nemo_automodel.components.distributed.cp_utils import (
+            attach_linear_attn_position_hooks,
+        )
+
+        for model_part in model.parts if hasattr(model, "parts") else [model]:
+            attach_linear_attn_position_hooks(model_part)
+
     print(model)
 
     # Compute model metadata after from_pretrained
