@@ -266,7 +266,28 @@ class Qwen3DSparkModel(Qwen3PreTrainedModel):
             bias=False,
         )
         self.hidden_norm = Qwen3RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+        # Reduced-draft-vocab checkpoints (e.g. RedHat speculators): lm_head
+        # predicts over draft_vocab_size tokens; d2t maps draft index ->
+        # target token id and t2d marks target-vocab membership. Both load
+        # from the checkpoint as persistent buffers. Full-vocab checkpoints
+        # (draft_vocab_size unset) keep the original behavior.
+        self.draft_vocab_size = getattr(config, "draft_vocab_size", None)
+        if self.draft_vocab_size is not None:
+            self.draft_vocab_size = int(self.draft_vocab_size)
+            self.register_buffer(
+                "d2t", torch.zeros(self.draft_vocab_size, dtype=torch.long)
+            )
+            self.register_buffer(
+                "t2d", torch.zeros(config.vocab_size, dtype=torch.bool)
+            )
+            self._t2d_index: Optional[torch.Tensor] = None
+        self.lm_head = nn.Linear(
+            config.hidden_size,
+            self.draft_vocab_size
+            if self.draft_vocab_size is not None
+            else config.vocab_size,
+            bias=False,
+        )
         self.block_size = int(config.block_size)
         self.mask_token_id = config.mask_token_id
         self.num_anchors = int(config.num_anchors)
@@ -289,6 +310,38 @@ class Qwen3DSparkModel(Qwen3PreTrainedModel):
                 input_dim += config.markov_rank
             self.confidence_head = AcceptRatePredictor(input_dim=input_dim)
         self.post_init()
+
+    def _get_d2t_target_ids(self) -> torch.Tensor:
+        """Absolute target token id for each draft index.
+
+        The checkpoint's ``d2t`` buffer stores OFFSETS (eagle3/speculators
+        convention): ``target_id = draft_idx + d2t[draft_idx]`` — the same
+        interpretation as vLLM's ``arange(draft_vocab) + d2t`` scatter index.
+        """
+        assert self.draft_vocab_size is not None
+        return (
+            torch.arange(self.d2t.numel(), device=self.d2t.device, dtype=torch.long)
+            + self.d2t
+        )
+
+    def _get_t2d_index(self) -> torch.Tensor:
+        """Target token id -> draft index, -1 when absent.
+
+        Built lazily so it reflects the checkpoint-loaded ``d2t`` buffer
+        (from_pretrained fills buffers after ``__init__``).
+        """
+        assert self.draft_vocab_size is not None
+        if self._t2d_index is None or self._t2d_index.device != self.d2t.device:
+            target_ids = self._get_d2t_target_ids()
+            index = torch.full(
+                (self.config.vocab_size,),
+                -1,
+                dtype=torch.long,
+                device=self.d2t.device,
+            )
+            index[target_ids] = torch.arange(target_ids.numel(), device=self.d2t.device)
+            self._t2d_index = index
+        return self._t2d_index
 
     def _apply(self, fn, recurse: bool = True):
         """Keep the RoPE ``inv_freq`` buffer in fp32 across dtype casts.
@@ -516,11 +569,29 @@ class Qwen3DSparkModel(Qwen3PreTrainedModel):
             2,
             safe_label_indices,
         )
+        # Markov prev-token embeddings index the FULL target vocab, so keep the
+        # unmapped ids for prev_token_ids even under a reduced draft vocab.
+        prev_source_token_ids = target_ids
+        in_draft_vocab = None
+        if self.draft_vocab_size is not None:
+            # CE labels must be draft-vocab indices; block positions whose
+            # target token has no draft-vocab entry are masked out of the loss.
+            t2d_index = self._get_t2d_index()
+            mapped_target_ids = t2d_index[target_ids]
+            in_draft_vocab = mapped_target_ids >= 0
+            target_ids = mapped_target_ids.clamp(min=0)
         aligned_target_logits = None
         if teacher_logits is not None:
             # Teacher distribution comes from the target/policy model's own raw
             # logits at the position that predicts each block token (offset k of
-            # anchor a is predicted at position a + k).
+            # anchor a is predicted at position a + k). Under a reduced draft
+            # vocab the caller pre-maps the teacher to draft-vocab order
+            # (teacher_logits[..., d2t]) so the vocab dims line up here.
+            assert teacher_logits.size(-1) == self.lm_head.out_features, (
+                f"teacher_logits vocab dim {teacher_logits.size(-1)} does not "
+                f"match the draft lm_head vocab {self.lm_head.out_features}; "
+                "reduced-vocab drafts require the teacher pre-mapped via d2t."
+            )
             target_pred_indices = (safe_label_indices - 1).clamp(min=0)
             aligned_target_logits = torch.gather(
                 teacher_logits.detach()
@@ -558,13 +629,15 @@ class Qwen3DSparkModel(Qwen3PreTrainedModel):
             doc_remaining=doc_remaining if packed else None,
             anchor_positions=anchor_positions if packed else None,
         )
+        if in_draft_vocab is not None:
+            eval_mask = eval_mask & in_draft_vocab
         anchor_token_ids = torch.gather(
             input_ids,
             1,
             anchor_positions,
         )
         prev_token_ids = torch.cat(
-            [anchor_token_ids.unsqueeze(-1), target_ids[:, :, :-1]],
+            [anchor_token_ids.unsqueeze(-1), prev_source_token_ids[:, :, :-1]],
             dim=-1,
         )
         draft_logits = self.compute_logits(output_hidden).reshape(

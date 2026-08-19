@@ -39,6 +39,71 @@ DRAFT_CHECKPOINT_DIRNAME = "draft"
 DSPARK_META_FILENAME = "dspark_meta.json"
 
 
+def load_dspark_draft_hf_config(model_name: str) -> Any:
+    """Load a DSpark draft config, adapting speculators-format checkpoints.
+
+    Two checkpoint families exist:
+    - Flat qwen3-style configs (e.g. deepseek-ai/dspark_qwen3_8b_block7):
+      loadable via AutoConfig, dspark fields at the top level.
+    - Speculators-format configs (e.g. RedHatAI/*-speculator.dspark): no
+      top-level model_type (AutoConfig fails), the draft transformer fields
+      nest under ``transformer_layer_config``, and target layers are named
+      ``aux_hidden_state_layer_ids``. These are adapted to the flat layout
+      the vendored Qwen3DSparkModel expects.
+    """
+    from transformers import AutoConfig, PretrainedConfig
+
+    config_dict, _ = PretrainedConfig.get_config_dict(model_name)
+    if (
+        config_dict.get("speculators_model_type") == "dspark"
+        or "transformer_layer_config" in config_dict
+    ):
+        return _adapt_speculators_dspark_config(config_dict)
+    return AutoConfig.from_pretrained(model_name)
+
+
+def _adapt_speculators_dspark_config(config_dict: dict[str, Any]) -> Any:
+    """Map a speculators-format dspark config onto the flat vendored layout."""
+    from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
+
+    layer_cfg = dict(config_dict["transformer_layer_config"])
+    model_type = layer_cfg.pop("model_type", "qwen3")
+    if model_type != "qwen3":
+        raise ValueError(
+            "Speculators dspark adapter only supports qwen3 draft transformers, "
+            f"got transformer_layer_config.model_type={model_type!r}."
+        )
+    adapted = Qwen3Config(**layer_cfg)
+    adapted.architectures = list(
+        config_dict.get("architectures") or ["Qwen3DSparkModel"]
+    )
+    adapted.block_size = int(config_dict["block_size"])
+    adapted.mask_token_id = int(config_dict["mask_token_id"])
+    # Convention shift: speculators/vLLM aux_hidden_state_layer_ids follow
+    # vLLM's capture indexing, where the hidden recorded as id j is appended
+    # AFTER layer j-1 runs (`_maybe_add_hidden_state(aux, idx + 1, ...)`),
+    # i.e. j = output of decoder layer j-1 and j=0 = embedding output. The
+    # vendored capture's target_layer_ids mean "output of layer i" with -1
+    # for the embedding, so shift by -1 to feed the drafter the same
+    # features it was pretrained on.
+    adapted.target_layer_ids = [
+        int(i) - 1 for i in config_dict["aux_hidden_state_layer_ids"]
+    ]
+    adapted.enable_confidence_head = bool(
+        config_dict.get("enable_confidence_head", False)
+    )
+    if adapted.enable_confidence_head:
+        adapted.confidence_head_with_markov = bool(
+            config_dict["confidence_head_with_markov"]
+        )
+    adapted.markov_rank = int(config_dict.get("markov_rank", 0))
+    if adapted.markov_rank > 0:
+        adapted.markov_head_type = str(config_dict["markov_head_type"])
+    if config_dict.get("draft_vocab_size"):
+        adapted.draft_vocab_size = int(config_dict["draft_vocab_size"])
+    return adapted
+
+
 class PolicyWithDraft(nn.Module):
     """Composite module pairing the policy and draft for optimizer state I/O.
 
@@ -104,9 +169,7 @@ def build_dspark_draft_model(
     mesh: Any,
 ) -> Qwen3DSparkModel:
     """Build, validate, and FSDP2-shard the DSpark draft from a pretrained checkpoint."""
-    from transformers import AutoConfig
-
-    draft_hf_config = AutoConfig.from_pretrained(model_name)
+    draft_hf_config = load_dspark_draft_hf_config(model_name)
     validate_dspark_draft_config(draft_hf_config, dspark_options)
     # num_anchors is a training-time knob, not checkpoint architecture; the
     # flex-attention implementation is required by the training block mask.
@@ -134,17 +197,31 @@ def build_dspark_draft_model(
 
 def _resolve_layers(
     policy_model: nn.Module,
-) -> tuple[nn.Module, nn.ModuleList]:
-    """Locate the decoder backbone (embedding owner) and its layer list."""
-    base = getattr(policy_model, "model", policy_model)
-    layers = getattr(base, "layers", None)
-    if layers is None:
-        raise ValueError(
-            "DSpark hidden capture could not locate `.layers` on the policy "
-            f"model (searched {type(base).__name__}). Only HF-style decoder "
-            "stacks are supported for DSpark co-training."
-        )
-    return base, layers
+) -> tuple[nn.Module, Any]:
+    """Locate the decoder backbone (embedding owner) and its layer container.
+
+    The container is an nn.ModuleList for HF-style stacks or an nn.ModuleDict
+    keyed by stringified layer index for Automodel custom backbones (e.g.
+    Qwen3_5Moe); use ``_layer_module`` to index either uniformly.
+    """
+    candidates = [getattr(policy_model, "model", None), policy_model]
+    for base in candidates:
+        if base is None:
+            continue
+        layers = getattr(base, "layers", None)
+        if layers is not None:
+            return base, layers
+    raise ValueError(
+        "DSpark hidden capture could not locate `.layers` on the policy "
+        f"model (searched {type(policy_model).__name__}). Only HF-style "
+        "decoder stacks are supported for DSpark co-training."
+    )
+
+
+def _layer_module(layers: Any, layer_id: int) -> nn.Module:
+    if isinstance(layers, nn.ModuleDict):
+        return layers[str(layer_id)]
+    return layers[layer_id]
 
 
 def _hook_output_tensor(output: Any) -> torch.Tensor:
@@ -192,7 +269,7 @@ class DSparkHiddenCapture:
                     )
                 self._modules_by_id[layer_id] = embed
             else:
-                self._modules_by_id[layer_id] = layers[layer_id]
+                self._modules_by_id[layer_id] = _layer_module(layers, layer_id)
         self._handles: list[Any] = []
         self._captured: dict[int, torch.Tensor] = {}
         self._armed = False
@@ -259,15 +336,26 @@ class DSparkRuntime:
         loss_weight: float,
         dp_group: Optional[dist.ProcessGroup],
         tp_group: Optional[dist.ProcessGroup] = None,
+        cp_group: Optional[dist.ProcessGroup] = None,
     ):
         self.draft_model = draft_model
         self.options = dspark_options
         self.loss_weight = float(loss_weight)
         self.dp_group = dp_group
         self.tp_group = tp_group
+        # Under context parallelism the captured hiddens, teacher logits, and
+        # input_ids are sequence-sharded (load-balanced); compute_loss gathers
+        # them to the full sequence and every CP peer runs the identical
+        # full-sequence draft forward (grads stay consistent through the
+        # draft's dp_cp FSDP mesh, like the TP-replicated case).
+        self.cp_group = cp_group
         self.capture: Optional[DSparkHiddenCapture] = None
         self._teacher_logits: Optional[torch.Tensor] = None
         self._num_microbatch_slots: int = 1
+
+    @property
+    def _cp_size(self) -> int:
+        return dist.get_world_size(self.cp_group) if self.cp_group is not None else 1
 
     def begin_global_batch(self, num_microbatch_slots: int) -> None:
         """Record this global batch's microbatch-slot count (identical on all ranks).
@@ -328,12 +416,53 @@ class DSparkRuntime:
             # Vocab-sharded under TP; the draft's teacher gather needs the full
             # vocab dimension.
             teacher_logits = teacher_logits.full_tensor()
+        if getattr(self.draft_model, "draft_vocab_size", None) is not None:
+            # Reduced-vocab drafts compare distributions over the draft vocab;
+            # mapping the teacher through d2t BEFORE the CP allgather shrinks
+            # the gathered tensor by vocab_ratio (e.g. 248320 -> 32000). Note
+            # d2t stores offsets (target_id = draft_idx + d2t[draft_idx]).
+            teacher_logits = teacher_logits.index_select(
+                -1, self.draft_model._get_d2t_target_ids().to(teacher_logits.device)
+            )
         target_hidden_states = self.capture.collect()
 
         input_ids = data_dict["input_ids"]
+        if isinstance(input_ids, DTensor):
+            # Under CP the loss prep wraps the load-balanced LOCAL shard as a
+            # DTensor with a (nominal) contiguous Shard(1) placement, so
+            # full_tensor() would return a mis-ordered sequence. Take the
+            # local shard; the CP branch below restores the true order via
+            # allgather_cp_sharded_tensor.
+            input_ids = input_ids.to_local()
         loss_mask = data_dict["token_mask"].float()
         if "sample_mask" in data_dict:
             loss_mask = loss_mask * data_dict["sample_mask"].float().unsqueeze(-1)
+
+        if self._cp_size > 1:
+            from nemo_rl.distributed.model_utils import allgather_cp_sharded_tensor
+
+            # Captured tensors are sequence-local (load-balanced CP shards);
+            # restore the full contiguous sequence on every CP peer. loss_mask
+            # comes from the un-sharded data dict and is already full-length.
+            teacher_logits = allgather_cp_sharded_tensor(
+                teacher_logits, self.cp_group, seq_dim=1
+            )
+            target_hidden_states = allgather_cp_sharded_tensor(
+                target_hidden_states, self.cp_group, seq_dim=1
+            )
+            if input_ids.size(1) != loss_mask.size(1):
+                input_ids = allgather_cp_sharded_tensor(
+                    input_ids, self.cp_group, seq_dim=1
+                )
+            if input_ids.size(1) != loss_mask.size(1) or target_hidden_states.size(
+                1
+            ) != loss_mask.size(1):
+                raise RuntimeError(
+                    "DSpark CP gather produced inconsistent sequence lengths: "
+                    f"input_ids={input_ids.size(1)}, "
+                    f"hiddens={target_hidden_states.size(1)}, "
+                    f"loss_mask={loss_mask.size(1)}."
+                )
 
         outputs: DSparkForwardOutput = self.draft_model(
             input_ids=input_ids,

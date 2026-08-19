@@ -150,8 +150,6 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
                     "set policy.draft.model_name (from-scratch draft init is not supported)."
                 )
             unsupported = {
-                "context_parallel_size > 1": dtensor_cfg.get("context_parallel_size", 1)
-                > 1,
                 # Under sequence parallelism the layer outputs seen by the
                 # hidden-capture hooks are bare sequence-sharded local tensors
                 # (no DTensor wrapper), which cannot be detected or gathered.

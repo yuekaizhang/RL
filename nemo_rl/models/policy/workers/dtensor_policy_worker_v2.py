@@ -110,10 +110,14 @@ def dtensor_params_generator(
 
         adapted_fqn_tensors = _maybe_adapt_tensor_to_hf(model, name, merged_tensor)
         for adapted_fqn, adapted_tensor in adapted_fqn_tensors:
-            # Convert to target dtype
+            # Convert floating-point tensors to the target dtype; integer/bool
+            # buffers (e.g. the reduced-vocab draft's d2t index map) must keep
+            # their dtype — token ids are not representable in bf16.
+            if adapted_tensor.is_floating_point():
+                adapted_tensor = adapted_tensor.to(target_dtype, non_blocking=True)
             yield (
                 adapted_fqn,
-                adapted_tensor.to(target_dtype, non_blocking=True).contiguous(),
+                adapted_tensor.contiguous(),
             )
             del adapted_tensor
         del adapted_fqn_tensors
@@ -366,6 +370,7 @@ class DTensorPolicyWorkerV2Impl(
                 loss_weight=float(draft_cfg.get("loss_weight", 1.0)),
                 dp_group=self.dp_mesh.get_group(),
                 tp_group=self.tp_mesh.get_group(),
+                cp_group=self.cp_mesh.get_group() if self.cp_size > 1 else None,
             )
             self.dspark_runtime.attach_capture(self.model)
 
@@ -1185,8 +1190,11 @@ class DTensorPolicyWorkerV2Impl(
         if self.draft_model is not None:
             # The draft is a native HF module: no adapter, no LoRA. DTensor
             # .shape is already the global shape, so no gather is needed here.
+            # Integer/bool buffers (e.g. d2t/t2d vocab maps) keep their dtype;
+            # the stream generator only casts floating-point tensors.
             for name, tensor in self.draft_model.state_dict().items():
-                state_dict_info[f"draft.{name}"] = (tensor.shape, self.dtype)
+                dtype = self.dtype if tensor.is_floating_point() else tensor.dtype
+                state_dict_info[f"draft.{name}"] = (tensor.shape, dtype)
 
         return state_dict_info
 

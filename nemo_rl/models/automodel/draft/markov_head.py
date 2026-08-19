@@ -25,15 +25,25 @@ from nemo_rl.models.automodel.draft._sampling import sample_tokens
 
 
 class VanillaMarkov(nn.Module):
-    def __init__(self, *, vocab_size: int, markov_rank: int):
+    def __init__(
+        self,
+        *,
+        vocab_size: int,
+        markov_rank: int,
+        embed_vocab_size: int | None = None,
+    ):
         super().__init__()
+        # Reduced-draft-vocab checkpoints (draft_vocab_size < target vocab)
+        # embed previous tokens over the FULL target vocab (token ids are
+        # target-space) while the bias projection outputs draft-vocab logits.
         self.vocab_size = int(vocab_size)
+        self.embed_vocab_size = int(embed_vocab_size or vocab_size)
         self.markov_rank = int(markov_rank)
         self.markov_head_type = "vanilla"
         assert self.markov_rank > 0, (
             f"VanillaMarkov requires markov_rank > 0, got {self.markov_rank}."
         )
-        self.markov_w1 = nn.Embedding(self.vocab_size, self.markov_rank)
+        self.markov_w1 = nn.Embedding(self.embed_vocab_size, self.markov_rank)
         self.markov_w2 = nn.Linear(self.markov_rank, self.vocab_size, bias=False)
 
     def get_prev_embeddings(self, token_ids: torch.Tensor) -> torch.Tensor:
@@ -311,11 +321,15 @@ def build_markov_head(config) -> nn.Module | None:
     if markov_rank == 0:
         return None
 
+    # Reduced-draft-vocab checkpoints: bias output over draft_vocab_size,
+    # prev-token embedding over the full target vocab.
+    output_vocab = int(getattr(config, "draft_vocab_size", None) or config.vocab_size)
     markov_head_type = str(config.markov_head_type).lower()
     if markov_head_type == "vanilla":
         return VanillaMarkov(
-            vocab_size=config.vocab_size,
+            vocab_size=output_vocab,
             markov_rank=markov_rank,
+            embed_vocab_size=config.vocab_size,
         )
     if markov_head_type == "gated":
         return GatedMarkovHead(
