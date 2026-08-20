@@ -155,8 +155,15 @@ def _collect_acceptance_diagnostics(
     available (``accept_rate_3d is None``).
     """
     zero = outputs.draft_logits.new_zeros((), dtype=torch.float32)
+    # Diagnostics index PROPOSALS: the dflash bonus-anchor slot
+    # (first_supervised_slot = 1) carries no acceptance signal — its
+    # always-false eval-mask entry would zero every cumprod prefix and shift
+    # the per-position rates — so all slot-indexed tensors are sliced to the
+    # supervised region first. For dspark (slot offset 0) this is a no-op.
+    first = int(outputs.first_supervised_slot)
     block_size = outputs.draft_logits.shape[2]
-    pos_zero = outputs.draft_logits.new_zeros((block_size,), dtype=torch.float32)
+    num_proposals = block_size - first
+    pos_zero = outputs.draft_logits.new_zeros((num_proposals,), dtype=torch.float32)
     terms = {
         "accept_rate_pos_num": pos_zero,
         "accept_rate_pos_den": pos_zero,
@@ -170,18 +177,22 @@ def _collect_acceptance_diagnostics(
     if accept_rate_3d is None:
         return terms
 
-    eval_mask = outputs.eval_mask.to(torch.float32)
-    valid_accept_rate = accept_rate_3d * eval_mask
-    # Per-block-position acceptance (accept_rate@k): sum over (batch, blocks) so the
+    eval_mask = outputs.eval_mask[..., first:].to(torch.float32)
+    accept_rate = accept_rate_3d[..., first:]
+    weight_mask = loss_weight_mask[..., first:]
+    valid_accept_rate = accept_rate * eval_mask
+    # Per-proposal acceptance (accept_rate@k): sum over (batch, blocks) so the
     # recipe can DP-all-reduce the numerator/denominator and form a global per-k
     # ratio; the aggregate accept_rate is just sum(num)/sum(den) over positions.
     terms["accept_rate_pos_num"] = valid_accept_rate.sum(dim=(0, 1))
     terms["accept_rate_pos_den"] = eval_mask.sum(dim=(0, 1))
 
     # Expected accepted prefix length per block: a draft token survives only when
-    # every earlier token in its block is also accepted, hence the running product
-    # over the block. The +1 counts the verified anchor token that seeds the block.
-    valid_blocks = (outputs.block_keep_mask & outputs.eval_mask.any(dim=-1)).to(
+    # every earlier PROPOSAL in its block is also accepted, hence the running
+    # product over the supervised slots. The +1 counts the verified token that
+    # seeds the block (the anchor prediction for dspark, the bonus token for
+    # dflash).
+    valid_blocks = (outputs.block_keep_mask & (eval_mask > 0).any(dim=-1)).to(
         torch.float32
     )
     tau_per_block = valid_accept_rate.cumprod(dim=-1).sum(dim=-1) + 1.0
@@ -189,18 +200,16 @@ def _collect_acceptance_diagnostics(
     terms["tau_den"] = valid_blocks.sum()
 
     if has_confidence and outputs.confidence_pred is not None:
-        confidence_probs = outputs.confidence_pred.float().sigmoid()
-        confidence_error = confidence_probs - accept_rate_3d
-        terms["confidence_abs_error_num"] = (
-            confidence_error.abs() * loss_weight_mask
-        ).sum()
-        terms["confidence_bias_num"] = (confidence_error * loss_weight_mask).sum()
+        confidence_probs = outputs.confidence_pred.float().sigmoid()[..., first:]
+        confidence_error = confidence_probs - accept_rate
+        terms["confidence_abs_error_num"] = (confidence_error.abs() * weight_mask).sum()
+        terms["confidence_bias_num"] = (confidence_error * weight_mask).sum()
         confidence_prefix = (confidence_probs * eval_mask).cumprod(dim=-1)
-        target_prefix = (accept_rate_3d * eval_mask).cumprod(dim=-1)
+        target_prefix = (accept_rate * eval_mask).cumprod(dim=-1)
         terms["confidence_cumprod_bias_num"] = (
-            (confidence_prefix - target_prefix) * loss_weight_mask
+            (confidence_prefix - target_prefix) * weight_mask
         ).sum()
-        terms["confidence_diag_den"] = loss_weight_mask.sum()
+        terms["confidence_diag_den"] = weight_mask.sum()
     return terms
 
 

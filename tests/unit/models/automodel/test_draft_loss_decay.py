@@ -57,6 +57,57 @@ def test_dflash_layout_first_proposal_gets_full_weight():
     assert weights[1] == 1.0, "the first proposed token must not be down-weighted"
 
 
+def _diagnostics(
+    first_supervised_slot: int, eval_mask: torch.Tensor, accept: torch.Tensor
+):
+    from nemo_rl.models.automodel.draft.common import DSparkForwardOutput
+    from nemo_rl.models.automodel.draft.loss import _collect_acceptance_diagnostics
+
+    bsz, blocks, block_size = eval_mask.shape
+    outputs = DSparkForwardOutput(
+        draft_logits=torch.zeros(bsz, blocks, block_size, 8),
+        target_ids=torch.zeros(bsz, blocks, block_size, dtype=torch.long),
+        eval_mask=eval_mask,
+        block_keep_mask=torch.ones(bsz, blocks, dtype=torch.bool),
+        first_supervised_slot=first_supervised_slot,
+    )
+    return _collect_acceptance_diagnostics(
+        outputs=outputs,
+        accept_rate_3d=accept,
+        loss_weight_mask=eval_mask.to(torch.float32),
+        has_confidence=False,
+    )
+
+
+def test_dflash_diagnostics_skip_bonus_anchor_slot():
+    """With the bonus-anchor layout the always-false slot 0 must not zero the
+    tau prefix product or shift the per-proposal acceptance rates."""
+    accept = torch.tensor([[[0.0, 0.8, 0.5, 0.25]]])
+    eval_mask = torch.tensor([[[False, True, True, True]]])
+    terms = _diagnostics(1, eval_mask, accept)
+
+    # accept_rate@k indexes proposals: [0.8, 0.5, 0.25], not shifted by the
+    # dead anchor column.
+    assert torch.allclose(terms["accept_rate_pos_num"], torch.tensor([0.8, 0.5, 0.25]))
+    assert torch.allclose(terms["accept_rate_pos_den"], torch.tensor([1.0, 1.0, 1.0]))
+
+    # tau = 1 (verified seed token) + 0.8 + 0.8*0.5 + 0.8*0.5*0.25 = 2.3,
+    # NOT the constant 1 a slot-0 zero in the cumprod would force.
+    assert torch.allclose(terms["tau_num"], torch.tensor(2.3))
+    assert terms["tau_den"].item() == 1.0
+
+
+def test_dspark_diagnostics_unchanged_by_slot_offset_zero():
+    accept = torch.tensor([[[0.8, 0.5, 0.25, 0.1]]])
+    eval_mask = torch.ones(1, 1, 4, dtype=torch.bool)
+    terms = _diagnostics(0, eval_mask, accept)
+    assert torch.allclose(
+        terms["accept_rate_pos_num"], torch.tensor([0.8, 0.5, 0.25, 0.1])
+    )
+    expected_tau = 1.0 + 0.8 + 0.8 * 0.5 + 0.8 * 0.5 * 0.25 + 0.8 * 0.5 * 0.25 * 0.1
+    assert torch.allclose(terms["tau_num"], torch.tensor(expected_tau))
+
+
 def test_dflash_forward_reports_first_supervised_slot():
     from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
 
