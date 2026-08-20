@@ -89,6 +89,20 @@ def test_embed_and_head_gradients_follow_trainability(trainable):
     assert fc_grad is not None and torch.isfinite(fc_grad).all()
 
 
+def test_next_token_position_mask_targets_label_positions():
+    """Rollout token_mask marks tokens; the TTT forward gates loss at logit
+    positions (position t supervises token t+1). The shift must supervise the
+    last-prompt-token position (label = FIRST response token, where drafting
+    starts) and zero the tail position (no next-token label)."""
+    from nemo_rl.models.automodel.draft.integration import next_token_position_mask
+
+    # prompt = positions 0..2, response tokens = positions 3..5 (T = 6).
+    token_mask = torch.tensor([[0.0, 0.0, 0.0, 1.0, 1.0, 1.0]])
+    shifted = next_token_position_mask(token_mask)
+    # Positions 2..4 predict tokens 3..5; position 5 has no label.
+    assert torch.equal(shifted, torch.tensor([[0.0, 0.0, 1.0, 1.0, 1.0, 0.0]]))
+
+
 def test_rope_inv_freq_stays_fp32_after_bf16_cast():
     """The training build casts the drafter to bf16; the RoPE frequency
     buffers must stay fp32 (matching the dspark drafter and vLLM serving's

@@ -748,6 +748,22 @@ def dspark_capture_ctx(runtime: Any):
 draft_capture_ctx = dspark_capture_ctx
 
 
+def next_token_position_mask(token_mask: torch.Tensor) -> torch.Tensor:
+    """Shift a per-TOKEN mask onto the POSITIONS whose logits predict it.
+
+    Rollout ``token_mask[t]`` marks token t as supervised (a response token),
+    but logits at position t predict token t+1 (the policy loss paths apply
+    ``token_mask[:, 1:]`` for the same reason). The eagle3 TTT forward gates
+    loss at logit/teacher positions, so its mask must be
+    ``mask[t] = token_mask[t + 1]`` with a zero tail: the final position has
+    no next-token label, and the last-prompt-token position (whose label is
+    the FIRST response token — exactly where drafting starts) is supervised.
+    """
+    shifted = torch.zeros_like(token_mask)
+    shifted[:, :-1] = token_mask[:, 1:]
+    return shifted
+
+
 class Eagle3Runtime:
     """Per-worker EAGLE3 co-training state: draft model, capture, TTT loss.
 
@@ -838,7 +854,9 @@ class Eagle3Runtime:
                 "mark padding for the packed-row document mask."
             )
         input_lengths = data_dict["input_lengths"].to(fused_hidden.device)
-        loss_mask = data_dict["token_mask"].float()
+        # See next_token_position_mask: the TTT forward gates loss at logit
+        # positions (position t supervises token t + 1), not at token indices.
+        loss_mask = next_token_position_mask(data_dict["token_mask"].float())
         if "sample_mask" in data_dict:
             loss_mask = loss_mask * data_dict["sample_mask"].float().unsqueeze(-1)
 
