@@ -71,7 +71,11 @@ from nemo_rl.models.automodel.config import (
     ModelAndOptimizerState,
     RuntimeConfig,
 )
-from nemo_rl.models.policy import PolicyConfig, TokenizerConfig
+from nemo_rl.models.policy import (
+    DEFAULT_DRAFT_ALGO,
+    PolicyConfig,
+    TokenizerConfig,
+)
 from nemo_rl.models.policy.utils import configure_dynamo_cache, resolve_model_class
 
 STRING_TO_DTYPE = {
@@ -820,7 +824,7 @@ def setup_model_and_optimizer(
     # Build the DSpark draft model before optimizer construction so its params
     # join the optimizer (and any optimizer-state resume) from the start.
     draft_cfg = config.get("draft", {}) or {}
-    draft_algo = draft_cfg.get("algo", "eagle3")
+    draft_algo = draft_cfg.get("algo", DEFAULT_DRAFT_ALGO)
     draft_enabled = bool(draft_cfg.get("enabled", False)) and draft_algo in (
         "dspark",
         "dflash",

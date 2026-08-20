@@ -62,7 +62,7 @@ from nemo_rl.models.automodel.train import (
     automodel_forward_backward,
     forward_with_post_processing_fn,
 )
-from nemo_rl.models.policy import PolicyConfig
+from nemo_rl.models.policy import DEFAULT_DRAFT_ALGO, PolicyConfig
 from nemo_rl.models.policy.interfaces import (
     ColocatablePolicyInterface,
     LogprobOutputSpec,
@@ -371,7 +371,7 @@ class DTensorPolicyWorkerV2Impl(
             from nemo_rl.models.policy import Eagle3DraftOptions
 
             draft_cfg = config.get("draft", {})
-            self.draft_algo = draft_cfg.get("algo", "dspark")
+            self.draft_algo = draft_cfg.get("algo", DEFAULT_DRAFT_ALGO)
             # loss_weight has no call-site default: its default lives in the
             # exemplar YAML (grpo_math_1B.yaml) like every other draft knob.
             loss_weight = float(draft_cfg["loss_weight"])
@@ -1521,7 +1521,7 @@ class DTensorPolicyWorkerV2Impl(
                     scheduler=self.scheduler,
                 )
             draft_cfg = self.cfg["draft"]
-            draft_algo = draft_cfg.get("algo", "dspark")
+            draft_algo = draft_cfg.get("algo", DEFAULT_DRAFT_ALGO)
             ttt_steps = None
             if draft_algo == "eagle3":
                 eagle3_options = Eagle3DraftOptions.model_validate(
@@ -1557,7 +1557,7 @@ class DTensorPolicyWorkerV2Impl(
             from nemo_rl.models.policy import Eagle3DraftOptions
 
             draft_cfg = self.cfg["draft"]
-            draft_algo = draft_cfg.get("algo", "dspark")
+            draft_algo = draft_cfg.get("algo", DEFAULT_DRAFT_ALGO)
             ttt_steps = None
             if draft_algo == "eagle3":
                 ttt_steps = int(

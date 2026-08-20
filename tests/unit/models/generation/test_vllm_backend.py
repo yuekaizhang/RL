@@ -890,6 +890,93 @@ def test_eagle3_owner_rejects_dspark_only_extras(monkeypatch):
 
 
 @pytest.mark.vllm
+def test_eagle3_megatron_partial_manifest_accepted(monkeypatch):
+    """The megatron eagle3 exporter streams a PARTIAL drafter (midlayer.*
+    alias, no embed_tokens) and relies on drafter module sharing; exact-key
+    validation must only apply to the DTensor-v2 full stream."""
+    from nemo_rl.models.generation.vllm import vllm_backend
+
+    ext, _ = _make_dspark_refit_extension(
+        vllm_backend,
+        drafter_param_names=_EAGLE3_DRAFTER_PARAM_NAMES,
+        method="eagle3",
+    )
+    monkeypatch.setattr(
+        vllm_backend, "get_pp_group", lambda: SimpleNamespace(is_last_rank=True)
+    )
+    info = {
+        "model.weight": ((4, 4), torch.bfloat16),
+        "draft.fc.weight": ((4, 4), torch.bfloat16),
+        "draft.midlayer.self_attn.q_proj.weight": ((4, 4), torch.bfloat16),
+        "draft.norm.weight": ((4,), torch.bfloat16),
+        "draft.lm_head.weight": ((4, 4), torch.bfloat16),
+        "draft.d2t": ((4,), torch.int64),
+    }
+    ext.prepare_refit_info(info)
+    assert ext.state_dict_info is info
+
+
+@pytest.mark.vllm
+def test_eagle3_megatron_partial_stream_skips_alias_guard():
+    """Loading the megatron partial stream through target-shared modules is
+    the pre-existing behavior and must not trip the full-stream alias guard."""
+    from nemo_rl.models.generation.vllm.vllm_backend import (
+        VllmInternalWorkerExtension,
+    )
+
+    ext = VllmInternalWorkerExtension.__new__(VllmInternalWorkerExtension)
+    shared_head = SimpleNamespace(weight=torch.zeros(4, 2))
+    drafter = SimpleNamespace(
+        model=SimpleNamespace(embed_tokens=None),
+        lm_head=shared_head,
+        named_parameters=lambda: [],
+        named_modules=lambda: [],
+        load_weights=MagicMock(),
+    )
+    ext.model_runner = SimpleNamespace(
+        vllm_config=SimpleNamespace(
+            speculative_config=SimpleNamespace(method="eagle3")
+        ),
+        speculator=SimpleNamespace(model=drafter),
+        model=SimpleNamespace(
+            model=SimpleNamespace(embed_tokens=None), lm_head=shared_head
+        ),
+    )
+    weights = [("lm_head.weight", torch.zeros(4, 2))]
+    ext._load_draft_weights(weights)
+    drafter.load_weights.assert_called_once()
+
+
+@pytest.mark.vllm
+def test_eagle3_full_stream_alias_guard_still_fires():
+    from nemo_rl.models.generation.vllm.vllm_backend import (
+        VllmInternalWorkerExtension,
+    )
+
+    ext = VllmInternalWorkerExtension.__new__(VllmInternalWorkerExtension)
+    shared_embed = SimpleNamespace(weight=torch.zeros(4, 2))
+    drafter = SimpleNamespace(
+        model=SimpleNamespace(embed_tokens=shared_embed),
+        lm_head=SimpleNamespace(weight=torch.zeros(4, 2)),
+        named_parameters=lambda: [],
+        load_weights=MagicMock(),
+    )
+    ext.model_runner = SimpleNamespace(
+        vllm_config=SimpleNamespace(
+            speculative_config=SimpleNamespace(method="eagle3")
+        ),
+        speculator=SimpleNamespace(model=drafter),
+        model=SimpleNamespace(
+            model=SimpleNamespace(embed_tokens=shared_embed),
+            lm_head=SimpleNamespace(weight=torch.zeros(4, 2)),
+        ),
+    )
+    weights = [("embed_tokens.weight", torch.zeros(4, 2))]
+    with pytest.raises(RuntimeError, match="share storage"):
+        ext._load_draft_weights(weights)
+
+
+@pytest.mark.vllm
 def test_disable_draft_module_sharing_forces_ownership():
     from vllm.v1.worker.gpu.spec_decode.dflash import utils as dflash_utils
     from vllm.v1.worker.gpu.spec_decode.dspark import utils as dspark_utils

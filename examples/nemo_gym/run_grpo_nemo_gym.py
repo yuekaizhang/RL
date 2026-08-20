@@ -53,6 +53,17 @@ from nemo_rl.utils.logger import get_next_experiment_dir, log_container_init_tim
 from nemo_rl.utils.timer import Timer
 
 
+def _draft_full_refit_enabled(policy_cfg) -> bool:
+    """DTensor-v2 draft co-training streams the drafter's full weight set."""
+    draft_cfg = policy_cfg.get("draft") or {}
+    dtensor_cfg = policy_cfg.get("dtensor_cfg") or {}
+    return (
+        bool(draft_cfg.get("enabled", False))
+        and bool(dtensor_cfg.get("enabled", False))
+        and bool(dtensor_cfg.get("_v2", False))
+    )
+
+
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Run GRPO training with configuration")
@@ -176,6 +187,7 @@ def main() -> None:
             tokenizer,
             has_refit_draft_weights=has_refit_draft_weights,
             trains_mtp=trains_mtp,
+            draft_full_refit=_draft_full_refit_enabled(config.policy),
         )
         if is_vlm and "vllm_cfg" in config.policy["generation"]:
             assert not config.policy["generation"]["vllm_cfg"]["skip_tokenizer_init"], (

@@ -456,17 +456,24 @@ class BaseVllmGenerationWorker:
             and not mtp_weights_from_refit
         )
 
-        # Draft co-training (dspark/dflash/eagle3) refits the drafter's trained
+        # Full-stream draft co-training refits the drafter's trained
         # embed_tokens/lm_head. Under load_format="dummy" the pinned vLLM would
         # alias those drafter modules to the target model's (no checkpoint load
         # ever marks them as owned), and the draft refit would then overwrite
         # the policy's serving weights through the alias. Disable the sharing
         # before engine creation; the env flag re-applies it in any spawned
-        # vLLM executor worker.
+        # vLLM executor worker. dspark/dflash exist only on the DTensor-v2
+        # full-stream path; eagle3 is gated on _draft_full_refit because the
+        # megatron eagle3 trainer streams a PARTIAL set (no embed_tokens) and
+        # relies on the drafter sharing the target's embedding.
+        draft_full_refit = bool(self.cfg.get("_draft_full_refit"))
         if (
             load_format == "dummy"
             and spec_cfg is not None
-            and spec_cfg.get("method") in ("dspark", "dflash", "eagle3")
+            and (
+                spec_cfg.get("method") in ("dspark", "dflash")
+                or (spec_cfg.get("method") == "eagle3" and draft_full_refit)
+            )
         ):
             # Deferred import: vllm_backend imports vllm eagerly, which only
             # this vLLM-venv worker process should pay for.

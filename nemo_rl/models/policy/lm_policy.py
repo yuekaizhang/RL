@@ -38,7 +38,7 @@ from nemo_rl.models.generation.interfaces import (
     GenerationInterface,
     GenerationOutputSpec,
 )
-from nemo_rl.models.policy import PolicyConfig
+from nemo_rl.models.policy import DEFAULT_DRAFT_ALGO, PolicyConfig
 from nemo_rl.models.policy.interfaces import (
     ColocatablePolicyInterface,
     LogprobOutputSpec,
@@ -124,7 +124,7 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
                 "Configure either Megatron (policy.megatron_cfg.enabled=true) or "
                 "DTensor (policy.dtensor_cfg.enabled=true), not both."
             )
-        draft_algo = draft_cfg.get("algo", "eagle3")
+        draft_algo = draft_cfg.get("algo", DEFAULT_DRAFT_ALGO)
         if draft_enabled and draft_algo not in ("eagle3", "dspark", "dflash"):
             raise ValueError(
                 f"policy.draft.algo must be one of {{'eagle3', 'dspark', 'dflash'}} "

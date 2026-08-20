@@ -126,6 +126,17 @@ _DRAFT_SKIPPED_KEY_SUBSTRINGS = {
 }
 
 
+def _is_full_eagle3_stream(draft_keys: "set[str] | list[str]") -> bool:
+    """Whether an eagle3 ``draft.*`` stream is the DTensor-v2 FULL drafter.
+
+    The DTensor-v2 co-training path streams the vendored model's entire
+    state_dict (always including ``embed_tokens``); the megatron eagle3
+    exporter intentionally omits ``embed_tokens`` and uses the ``midlayer.*``
+    alias, relying on drafter module sharing at serve time.
+    """
+    return any("embed_tokens" in key for key in draft_keys)
+
+
 def _format_refit_key_error(label: str, keys: set[str]) -> str:
     """Format a bounded refit-key diagnostic."""
     ordered = sorted(keys)
@@ -619,6 +630,13 @@ class VllmInternalWorkerExtension:
             # carry only policy weights. Exact-key validation applies only when
             # the trainer co-trains (and therefore streams) the draft.
             return
+        if method == "eagle3" and not _is_full_eagle3_stream(provided):
+            # Megatron eagle3 co-training streams a PARTIAL drafter (no
+            # embed_tokens, midlayer.* alias for the single layer) and relies
+            # on the drafter sharing the target's embedding; exact-key
+            # validation against the vLLM parameter layout only applies to
+            # the DTensor-v2 full stream.
+            return
         expected = self._expected_draft_keys()
         skipped = _DRAFT_SKIPPED_KEY_SUBSTRINGS[method]
         missing = expected - provided
@@ -661,9 +679,15 @@ class VllmInternalWorkerExtension:
             return
 
         method = self._speculative_method()
+        # The megatron eagle3 partial stream predates (and must keep) the
+        # lenient path: no alias guard, warn-and-skip on a missing drafter.
+        strict_cotraining = method in ("dspark", "dflash") or (
+            method == "eagle3"
+            and _is_full_eagle3_stream([name for name, _ in draft_weights])
+        )
         draft_model = self._get_drafter_model()
         if draft_model is None:
-            if method in COTRAINED_SPECULATIVE_METHODS:
+            if strict_cotraining:
                 if self._draft_owns_speculator():
                     # Draft co-training streams every draft weight on each
                     # refit; an owning rank without a speculator would silently
@@ -681,7 +705,7 @@ class VllmInternalWorkerExtension:
                 "[draft] Received draft weights but vLLM drafter is unavailable; skipping draft update."
             )
             return
-        if method in COTRAINED_SPECULATIVE_METHODS:
+        if strict_cotraining:
             self._assert_drafter_owns_modules(draft_model, draft_weights)
         draft_weights = self._trim_vocab_padding(draft_model, draft_weights)
         draft_model.load_weights(weights=draft_weights)

@@ -487,6 +487,12 @@ class DSparkDraftOptions(TypedDict):
     train_embed_and_head: bool
 
 
+# Default drafter family when policy.draft.enabled is set without an explicit
+# algo (the original megatron co-training path predates the algo field).
+# Every reader of policy.draft["algo"] must use this same default.
+DEFAULT_DRAFT_ALGO = "eagle3"
+
+
 class Eagle3DraftOptions(BaseModel, extra="allow"):
     """Training options for EAGLE3 draft co-training (DTensor-v2 backend only).
 
