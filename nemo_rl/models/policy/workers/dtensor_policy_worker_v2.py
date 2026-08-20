@@ -1522,12 +1522,13 @@ class DTensorPolicyWorkerV2Impl(
                 )
             draft_cfg = self.cfg["draft"]
             draft_algo = draft_cfg.get("algo", "dspark")
+            ttt_steps = None
             if draft_algo == "eagle3":
-                train_embed_and_head = bool(
-                    Eagle3DraftOptions.model_validate(
-                        draft_cfg.get("eagle3", {}) or {}
-                    ).train_embed_and_head
+                eagle3_options = Eagle3DraftOptions.model_validate(
+                    draft_cfg.get("eagle3", {}) or {}
                 )
+                train_embed_and_head = bool(eagle3_options.train_embed_and_head)
+                ttt_steps = int(eagle3_options.ttt_steps)
             else:
                 train_embed_and_head = bool(draft_cfg["dspark"]["train_embed_and_head"])
             save_draft_checkpoint(
@@ -1539,6 +1540,7 @@ class DTensorPolicyWorkerV2Impl(
                     self.optimizer,
                     algo=draft_algo,
                     train_embed_and_head=train_embed_and_head,
+                    ttt_steps=ttt_steps,
                 ),
             )
 
@@ -1552,7 +1554,17 @@ class DTensorPolicyWorkerV2Impl(
             from nemo_rl.models.automodel.draft.integration import (
                 load_dspark_checkpoint,
             )
+            from nemo_rl.models.policy import Eagle3DraftOptions
 
+            draft_cfg = self.cfg["draft"]
+            draft_algo = draft_cfg.get("algo", "dspark")
+            ttt_steps = None
+            if draft_algo == "eagle3":
+                ttt_steps = int(
+                    Eagle3DraftOptions.model_validate(
+                        draft_cfg.get("eagle3", {}) or {}
+                    ).ttt_steps
+                )
             load_dspark_checkpoint(
                 self.checkpoint_manager,
                 model=self.model,
@@ -1562,8 +1574,9 @@ class DTensorPolicyWorkerV2Impl(
                 scheduler=self.scheduler,
                 weights_path=weights_path,
                 optimizer_path=optimizer_path,
-                model_name=self.cfg["draft"]["model_name"],
-                algo=self.cfg["draft"].get("algo", "dspark"),
+                model_name=draft_cfg["model_name"],
+                algo=draft_algo,
+                ttt_steps=ttt_steps,
             )
         else:
             self.checkpoint_manager.load_checkpoint(

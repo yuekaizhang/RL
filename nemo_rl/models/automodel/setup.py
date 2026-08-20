@@ -860,6 +860,7 @@ def setup_model_and_optimizer(
                 target_num_hidden_layers=target_text_config.num_hidden_layers,
             )
             draft_learning_rate = float(eagle3_options.learning_rate)
+            draft_ttt_steps = int(eagle3_options.ttt_steps)
         else:
             draft_model = build_dspark_draft_model(
                 model_name=draft_cfg["model_name"],
@@ -869,6 +870,7 @@ def setup_model_and_optimizer(
                 algo=draft_algo,
             )
             draft_learning_rate = float(draft_cfg["dspark"]["learning_rate"])
+            draft_ttt_steps = None
         composite_model = PolicyWithDraft(policy=model, draft=draft_model)
 
     # Initialize optimizer
@@ -963,6 +965,7 @@ def setup_model_and_optimizer(
                 optimizer_path=optimizer_path,
                 model_name=draft_cfg["model_name"],
                 algo=draft_algo,
+                ttt_steps=draft_ttt_steps,
             )
         else:
             checkpoint_manager.load_checkpoint(

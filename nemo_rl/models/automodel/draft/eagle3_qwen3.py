@@ -31,6 +31,10 @@
 #   semantics: causal AND same-document, with per-TTT-step diagonal
 #   extensions); the training sequences here are short enough that dense
 #   masks are cheap and avoid the flex-attention dependency.
+# - The embedding lookup in the TTT loop is not wrapped in torch.no_grad()
+#   (the upstream trainer's no_grad silently blocks embedding gradients even
+#   when embed_requires_grad is set); trainability is governed by
+#   set_embedding_head_trainable() alone.
 # - The forward returns per-step loss numerators/denominators (plus accuracy
 #   counts) instead of a locally normalized scalar so the RL runtime can apply
 #   NeMo-RL's global (DP-reduced, microbatch-slot) normalization. With a
@@ -378,8 +382,12 @@ class Qwen3Eagle3DraftModel(Qwen3PreTrainedModel):
 
         terms = Eagle3ForwardTerms([], [], [], [], [], [])
         for ttt_step in range(ttt_steps):
-            with torch.no_grad():
-                input_embeds = self.embed_tokens(input_ids)
+            # Unlike the speculators trainer, the embedding lookup is NOT
+            # wrapped in torch.no_grad(): train_embed_and_head must actually
+            # train the embedding table, so trainability is controlled solely
+            # by requires_grad via set_embedding_head_trainable(). Forward
+            # values are identical either way (verified by the parity script).
+            input_embeds = self.embed_tokens(input_ids)
             cache_position = torch.arange(
                 ttt_step * total_seq_len,
                 (ttt_step + 1) * total_seq_len,

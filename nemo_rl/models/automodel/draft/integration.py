@@ -948,11 +948,14 @@ def draft_meta_record(
     optimizer: Optional[torch.optim.Optimizer],
     algo: str = "dspark",
     train_embed_and_head: Optional[bool] = None,
+    ttt_steps: Optional[int] = None,
 ) -> dict[str, Any]:
     """Versioned per-algo draft checkpoint metadata.
 
     Legacy dspark checkpoints predate versioning (no meta_version/algo); the
-    validator treats those as dspark/v0.
+    validator treats those as dspark/v0. ``ttt_steps`` is part of the eagle3
+    training contract (the unroll depth the drafter was trained for) and is
+    required there; the block-drafter algos ignore it.
     """
     config = draft_model.config
     record: dict[str, Any] = {
@@ -973,10 +976,16 @@ def draft_meta_record(
             }
         )
     elif algo == "eagle3":
+        if ttt_steps is None:
+            raise ValueError(
+                "eagle3 draft checkpoint metadata requires ttt_steps (the TTT "
+                "unroll depth is part of the training contract)."
+            )
         record.update(
             {
                 "aux_layer_ids": [int(i) for i in config.target_layer_ids],
                 "draft_vocab_size": int(config.draft_vocab_size),
+                "ttt_steps": int(ttt_steps),
             }
         )
     else:
@@ -1048,7 +1057,7 @@ def validate_dspark_checkpoint_meta(
             "Refusing to resume with an inconsistent draft configuration."
         )
     if expected_algo == "eagle3":
-        keys = ["aux_layer_ids", "draft_vocab_size"]
+        keys = ["aux_layer_ids", "draft_vocab_size", "ttt_steps"]
     else:
         keys = ["block_size", "mask_token_id", "target_layer_ids"]
         # draft_vocab_size and sample_from_anchor were added with versioning;
@@ -1105,6 +1114,7 @@ def load_dspark_checkpoint(
     optimizer_path: Optional[str],
     model_name: str,
     algo: str = "dspark",
+    ttt_steps: Optional[int] = None,
 ) -> None:
     """Load a dspark checkpoint with the composite-optimizer pairing rule.
 
@@ -1118,7 +1128,9 @@ def load_dspark_checkpoint(
     load_draft_checkpoint(
         draft_model,
         weights_path,
-        expected_meta=draft_meta_record(draft_model, model_name, optimizer, algo=algo),
+        expected_meta=draft_meta_record(
+            draft_model, model_name, optimizer, algo=algo, ttt_steps=ttt_steps
+        ),
     )
     if optimizer_path and optimizer is not None:
         checkpoint_manager.checkpointer.load_optimizer(

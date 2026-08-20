@@ -111,6 +111,7 @@ def test_eagle3_meta_compares_per_algo_keys():
         "algo": "eagle3",
         "aux_layer_ids": [1, 17, 33],
         "draft_vocab_size": 32000,
+        "ttt_steps": 3,
         "optimizer_layout": None,
     }
     validate_dspark_checkpoint_meta(saved, dict(saved))
@@ -118,6 +119,39 @@ def test_eagle3_meta_compares_per_algo_keys():
         validate_dspark_checkpoint_meta(saved, dict(saved, aux_layer_ids=[2, 18, 34]))
     with pytest.raises(ValueError, match="draft_vocab_size"):
         validate_dspark_checkpoint_meta(saved, dict(saved, draft_vocab_size=64000))
+
+
+def test_eagle3_meta_rejects_ttt_steps_mismatch():
+    """Resume must not silently change the TTT unroll depth the draft was
+    trained for."""
+    saved = {
+        "meta_version": 1,
+        "algo": "eagle3",
+        "aux_layer_ids": [1, 17, 33],
+        "draft_vocab_size": 32000,
+        "ttt_steps": 3,
+        "optimizer_layout": None,
+    }
+    with pytest.raises(ValueError, match="ttt_steps"):
+        validate_dspark_checkpoint_meta(saved, dict(saved, ttt_steps=5))
+
+
+def test_eagle3_meta_record_requires_and_records_ttt_steps():
+    from types import SimpleNamespace
+
+    from nemo_rl.models.automodel.draft.integration import draft_meta_record
+
+    draft_model = SimpleNamespace(
+        config=SimpleNamespace(target_layer_ids=[1, 17, 33], draft_vocab_size=32000)
+    )
+    record = draft_meta_record(
+        draft_model, "tiny-eagle3", None, algo="eagle3", ttt_steps=3
+    )
+    assert record["ttt_steps"] == 3
+    assert record["aux_layer_ids"] == [1, 17, 33]
+
+    with pytest.raises(ValueError, match="ttt_steps"):
+        draft_meta_record(draft_model, "tiny-eagle3", None, algo="eagle3")
 
 
 def test_dspark_draft_vocab_size_compared_only_when_recorded():
