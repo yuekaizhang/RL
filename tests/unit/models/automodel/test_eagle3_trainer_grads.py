@@ -87,3 +87,15 @@ def test_embed_and_head_gradients_follow_trainability(trainable):
     # The drafter trunk always trains.
     fc_grad = model.fc.weight.grad
     assert fc_grad is not None and torch.isfinite(fc_grad).all()
+
+
+def test_rope_inv_freq_stays_fp32_after_bf16_cast():
+    """The training build casts the drafter to bf16; the RoPE frequency
+    buffers must stay fp32 (matching the dspark drafter and vLLM serving's
+    fp32 RoPE cache) or positions dephase and acceptance erodes."""
+    model = _tiny_eagle3_model()
+    model.to(torch.bfloat16)
+    assert model.rotary_emb.inv_freq.dtype == torch.float32
+    assert model.rotary_emb.original_inv_freq.dtype == torch.float32
+    # The rest of the model really did cast.
+    assert model.fc.weight.dtype == torch.bfloat16

@@ -59,6 +59,10 @@ class DSparkForwardOutput:
     confidence_pred: Optional[torch.Tensor] = None
     # [batch_size, num_anchors, block_size, vocab_size]
     aligned_target_logits: Optional[torch.Tensor] = None
+    # First supervised block slot: 0 for the next-token (dspark) layout, 1
+    # for the bonus-anchor (dflash) layout where slot 0 carries no loss.
+    # Loss-position weighting (loss_decay_gamma) counts proposals from here.
+    first_supervised_slot: int = 0
 
 
 class AcceptRatePredictor(nn.Module):

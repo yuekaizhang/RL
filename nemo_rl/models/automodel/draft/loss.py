@@ -54,10 +54,22 @@ def _build_loss_weight_mask(
     block_size: int,
     device: torch.device,
     loss_decay_gamma: Optional[float],
+    first_supervised_slot: int = 0,
 ) -> torch.Tensor:
+    """Per-slot loss weights: eval mask times the positional decay.
+
+    Decay positions count PROPOSALS, not raw block slots: the k-th supervised
+    slot gets ``exp(-k / gamma)`` so the first proposed token always has
+    weight 1. Under the dflash bonus-anchor layout slot 0 is unsupervised
+    (``first_supervised_slot = 1``); its clamped weight is irrelevant because
+    the eval mask zeroes it.
+    """
     loss_weight_mask = eval_mask.to(torch.float32)
     if loss_decay_gamma is not None and loss_decay_gamma > 0:
-        positions = torch.arange(block_size, device=device).view(1, 1, -1)
+        positions = (
+            torch.arange(block_size, device=device).view(1, 1, -1)
+            - int(first_supervised_slot)
+        ).clamp(min=0)
         decay_weights = torch.exp(-positions.float() / float(loss_decay_gamma))
         loss_weight_mask = loss_weight_mask * decay_weights
     return loss_weight_mask
@@ -209,6 +221,7 @@ def _collect_local_terms(
         block_size=block_size,
         device=device,
         loss_decay_gamma=loss_decay_gamma,
+        first_supervised_slot=outputs.first_supervised_slot,
     )
     flat_logits = draft_logits.reshape(-1, vocab_size)
     flat_targets = target_ids.reshape(-1)

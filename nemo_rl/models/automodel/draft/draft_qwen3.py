@@ -686,6 +686,7 @@ class Qwen3DSparkModel(Qwen3PreTrainedModel):
             block_keep_mask=block_keep_mask,
             confidence_pred=confidence_pred,
             aligned_target_logits=aligned_target_logits,
+            first_supervised_slot=0 if self.sample_from_anchor else 1,
         )
 
 

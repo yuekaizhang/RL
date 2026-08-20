@@ -61,6 +61,8 @@ from transformers.models.qwen3.modeling_qwen3 import (
     Qwen3RotaryEmbedding,
 )
 
+from nemo_rl.models.automodel.draft.common import pin_rope_inv_freq_fp32
+
 _LOSS_REDUCTION_EPS = 1e-5
 
 
@@ -283,6 +285,18 @@ class Qwen3Eagle3DraftModel(Qwen3PreTrainedModel):
         self._t2d_index: Optional[torch.Tensor] = None
 
         self.post_init()
+
+    def _apply(self, fn, recurse: bool = True):
+        """Keep the RoPE ``inv_freq`` buffer in fp32 across dtype casts.
+
+        ``model.to(bfloat16)`` (the training build path) would otherwise round
+        ``inv_freq`` to bf16 and dephase RoPE against vLLM serving's fp32
+        cache, eroding draft acceptance (same pin as the dspark drafter; see
+        ``pin_rope_inv_freq_fp32``).
+        """
+        module = super()._apply(fn, recurse=recurse)
+        pin_rope_inv_freq_fp32(getattr(self, "rotary_emb", None))
+        return module
 
     def set_embedding_head_trainable(self, trainable: bool):
         self.embed_tokens.requires_grad_(trainable)
