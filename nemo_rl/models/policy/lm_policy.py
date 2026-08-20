@@ -125,29 +125,39 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
                 "DTensor (policy.dtensor_cfg.enabled=true), not both."
             )
         draft_algo = draft_cfg.get("algo", "eagle3")
-        if draft_enabled and draft_algo not in ("eagle3", "dspark"):
+        if draft_enabled and draft_algo not in ("eagle3", "dspark", "dflash"):
             raise ValueError(
-                f"policy.draft.algo must be one of {{'eagle3', 'dspark'}} when "
-                f"policy.draft.enabled=true, got {draft_algo!r}."
+                f"policy.draft.algo must be one of {{'eagle3', 'dspark', 'dflash'}} "
+                f"when policy.draft.enabled=true, got {draft_algo!r}."
             )
-        if draft_enabled and draft_algo == "eagle3" and not megatron_enable:
-            raise ValueError(
-                "policy.draft.algo=eagle3 is only supported with the Megatron backend. "
-                "Set policy.megatron_cfg.enabled=true or disable policy.draft."
-            )
-        if draft_enabled and draft_algo == "dspark":
-            dtensor_cfg = config.get("dtensor_cfg", {})
-            if megatron_enable or not (
-                dtensor_enable and dtensor_cfg.get("_v2", False)
-            ):
+        dtensor_cfg = config.get("dtensor_cfg", {})
+        dtensor_v2_enable = dtensor_enable and dtensor_cfg.get("_v2", False)
+        if draft_enabled and draft_algo == "eagle3":
+            # eagle3 runs on the Megatron backend (single-step distillation)
+            # or the DTensor v2 backend (TTT training); DTensor v1 has no
+            # draft support.
+            if not megatron_enable and not dtensor_v2_enable:
                 raise ValueError(
-                    "policy.draft.algo=dspark requires the DTensor v2 backend "
+                    "policy.draft.algo=eagle3 requires the Megatron backend "
+                    "(policy.megatron_cfg.enabled=true) or the DTensor v2 "
+                    "backend (policy.dtensor_cfg.enabled=true and "
+                    "policy.dtensor_cfg._v2=true)."
+                )
+        if draft_enabled and draft_algo in ("dspark", "dflash"):
+            if megatron_enable or not dtensor_v2_enable:
+                raise ValueError(
+                    f"policy.draft.algo={draft_algo} requires the DTensor v2 backend "
                     "(policy.dtensor_cfg.enabled=true and policy.dtensor_cfg._v2=true)."
                 )
+        if draft_enabled and (
+            draft_algo in ("dspark", "dflash")
+            or (draft_algo == "eagle3" and dtensor_v2_enable)
+        ):
             if draft_cfg.get("model_name") is None:
                 raise ValueError(
-                    "policy.draft.algo=dspark requires a pretrained DSpark checkpoint; "
-                    "set policy.draft.model_name (from-scratch draft init is not supported)."
+                    f"policy.draft.algo={draft_algo} requires a pretrained draft "
+                    "checkpoint; set policy.draft.model_name (from-scratch draft "
+                    "init is not supported)."
                 )
             unsupported = {
                 # Under sequence parallelism the layer outputs seen by the
@@ -161,9 +171,9 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
             enabled_unsupported = [name for name, on in unsupported.items() if on]
             if enabled_unsupported:
                 raise ValueError(
-                    "policy.draft.algo=dspark does not support: "
+                    f"policy.draft.algo={draft_algo} does not support: "
                     f"{', '.join(enabled_unsupported)}. Disable these options to "
-                    "co-train a DSpark draft."
+                    "co-train a draft."
                 )
         if draft_enabled and bool(
             config.get("sequence_packing", {}).get("enabled", False)

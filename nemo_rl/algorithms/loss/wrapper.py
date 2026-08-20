@@ -289,24 +289,25 @@ class DraftLossWrapper:
         return combined_loss, metrics
 
 
-class DSparkLossWrapper:
-    """Combine policy loss with the DSpark block-drafter loss (automodel path).
+class DraftRuntimeLossWrapper:
+    """Combine policy loss with a co-trained drafter loss (automodel path).
 
     Structural sibling of DraftLossWrapper: the policy loss is computed exactly
-    as without a draft, then the DSpark loss runs the draft forward on the
-    hidden states and raw teacher logits captured during the policy forward
-    (both detached, so the policy trunk's gradients are unchanged).
+    as without a draft, then the draft runtime (dspark/dflash block drafter or
+    eagle3 TTT drafter) runs the draft forward on the hidden states and raw
+    teacher logits captured during the policy forward (both detached, so the
+    policy trunk's gradients are unchanged).
     """
 
     def __init__(
         self,
         loss_fn: Callable[..., tuple[torch.Tensor, dict[str, Any]]],
         prepare_fn: Callable[..., Any],
-        dspark_runtime: Any,
+        draft_runtime: Any,
     ):
         self.loss_fn = loss_fn
         self.prepare_fn = prepare_fn
-        self.dspark_runtime = dspark_runtime
+        self.draft_runtime = draft_runtime
 
     def __call__(
         self,
@@ -327,10 +328,14 @@ class DSparkLossWrapper:
             **loss_input,
         )
 
-        draft_loss, draft_metrics = self.dspark_runtime.compute_loss(prepared_data)
-        combined_loss = policy_loss + self.dspark_runtime.loss_weight * draft_loss
+        draft_loss, draft_metrics = self.draft_runtime.compute_loss(prepared_data)
+        combined_loss = policy_loss + self.draft_runtime.loss_weight * draft_loss
         metrics.update(draft_metrics)
         return combined_loss, metrics
+
+
+# Backwards-compatible alias from when the automodel path only supported dspark.
+DSparkLossWrapper = DraftRuntimeLossWrapper
 
 
 def wrap_loss_fn_with_input_preparation(

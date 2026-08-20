@@ -820,16 +820,19 @@ def setup_model_and_optimizer(
     # Build the DSpark draft model before optimizer construction so its params
     # join the optimizer (and any optimizer-state resume) from the start.
     draft_cfg = config.get("draft", {}) or {}
-    dspark_enabled = (
-        bool(draft_cfg.get("enabled", False))
-        and draft_cfg.get("algo", "eagle3") == "dspark"
+    draft_algo = draft_cfg.get("algo", "eagle3")
+    draft_enabled = bool(draft_cfg.get("enabled", False)) and draft_algo in (
+        "dspark",
+        "dflash",
+        "eagle3",
     )
     draft_model = None
     composite_model = None
-    if dspark_enabled:
+    if draft_enabled:
         from nemo_rl.models.automodel.draft.integration import (
             PolicyWithDraft,
             build_dspark_draft_model,
+            build_eagle3_draft_model,
         )
 
         # Use the configured training precision, NOT model_config.torch_dtype:
@@ -838,12 +841,34 @@ def setup_model_and_optimizer(
         # transient memory in the already memory-tight co-training recipe.
         # The shared optimizer's master weights preserve update precision.
         draft_dtype = runtime_config.dtype
-        draft_model = build_dspark_draft_model(
-            model_name=draft_cfg["model_name"],
-            dspark_options=draft_cfg["dspark"],
-            torch_dtype=draft_dtype,
-            mesh=device_mesh["dp_cp"],
-        )
+        if draft_algo == "eagle3":
+            from nemo_rl.models.policy import Eagle3DraftOptions
+
+            # The BaseModel centralizes the option defaults (v2 config
+            # convention); the loaded dict is validated against it once here.
+            eagle3_options = Eagle3DraftOptions.model_validate(
+                draft_cfg.get("eagle3", {}) or {}
+            )
+            target_text_config = (
+                getattr(model_config, "text_config", None) or model_config
+            )
+            draft_model = build_eagle3_draft_model(
+                model_name=draft_cfg["model_name"],
+                eagle3_options=eagle3_options,
+                torch_dtype=draft_dtype,
+                mesh=device_mesh["dp_cp"],
+                target_num_hidden_layers=target_text_config.num_hidden_layers,
+            )
+            draft_learning_rate = float(eagle3_options.learning_rate)
+        else:
+            draft_model = build_dspark_draft_model(
+                model_name=draft_cfg["model_name"],
+                dspark_options=draft_cfg["dspark"],
+                torch_dtype=draft_dtype,
+                mesh=device_mesh["dp_cp"],
+                algo=draft_algo,
+            )
+            draft_learning_rate = float(draft_cfg["dspark"]["learning_rate"])
         composite_model = PolicyWithDraft(policy=model, draft=draft_model)
 
     # Initialize optimizer
@@ -878,7 +903,7 @@ def setup_model_and_optimizer(
                         "params": [
                             p for p in draft_model.parameters() if p.requires_grad
                         ],
-                        "lr": float(draft_cfg["dspark"]["learning_rate"]),
+                        "lr": draft_learning_rate,
                     },
                 ],
                 **optimizer_kwargs,
@@ -937,6 +962,7 @@ def setup_model_and_optimizer(
                 weights_path=weights_path,
                 optimizer_path=optimizer_path,
                 model_name=draft_cfg["model_name"],
+                algo=draft_algo,
             )
         else:
             checkpoint_manager.load_checkpoint(

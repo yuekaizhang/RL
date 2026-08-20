@@ -32,51 +32,105 @@ from torch.distributed.tensor import DTensor
 
 from nemo_rl.models.automodel.draft.common import DSparkForwardOutput
 from nemo_rl.models.automodel.draft.draft_qwen3 import Qwen3DSparkModel
+from nemo_rl.models.automodel.draft.eagle3_qwen3 import Qwen3Eagle3DraftModel
 from nemo_rl.models.automodel.draft.loss import compute_dspark_loss
+from nemo_rl.models.policy import Eagle3DraftOptions
 
 DSPARK_REQUIRED_CONFIG_FIELDS = ("block_size", "target_layer_ids", "mask_token_id")
 DRAFT_CHECKPOINT_DIRNAME = "draft"
 DSPARK_META_FILENAME = "dspark_meta.json"
 
 
-def load_dspark_draft_hf_config(model_name: str) -> Any:
-    """Load a DSpark draft config, adapting speculators-format checkpoints.
+def load_draft_hf_config(
+    model_name: str,
+    algo: str = "dspark",
+    target_num_hidden_layers: Optional[int] = None,
+) -> Any:
+    """Load a draft config for ``algo``, adapting speculators-format checkpoints.
 
     Two checkpoint families exist:
-    - Flat qwen3-style configs (e.g. deepseek-ai/dspark_qwen3_8b_block7):
-      loadable via AutoConfig, dspark fields at the top level.
-    - Speculators-format configs (e.g. RedHatAI/*-speculator.dspark): no
-      top-level model_type (AutoConfig fails), the draft transformer fields
-      nest under ``transformer_layer_config``, and target layers are named
-      ``aux_hidden_state_layer_ids``. These are adapted to the flat layout
-      the vendored Qwen3DSparkModel expects.
+    - Flat qwen3-style configs (e.g. deepseek-ai/dspark_qwen3_8b_block7 and
+      its dflash sibling): loadable via AutoConfig, drafter fields at the top
+      level. Their ``target_layer_ids`` already use the trainer's
+      output-of-layer convention and their blocks use the next-token
+      supervision layout (they were produced by the trainer this code is
+      vendored from), so no convention shifts apply.
+    - Speculators-format configs (e.g. RedHatAI/*-speculator.*): no top-level
+      model_type (AutoConfig fails), the draft transformer fields nest under
+      ``transformer_layer_config``, and layer/block conventions follow
+      vLLM/speculators indexing. These are adapted to the flat layout the
+      vendored models expect.
     """
     from transformers import AutoConfig, PretrainedConfig
 
+    if algo not in ("dspark", "dflash", "eagle3"):
+        raise ValueError(f"Unknown draft algo {algo!r} for checkpoint {model_name}.")
+
     config_dict, _ = PretrainedConfig.get_config_dict(model_name)
-    if (
-        config_dict.get("speculators_model_type") == "dspark"
-        or "transformer_layer_config" in config_dict
-    ):
-        return _adapt_speculators_dspark_config(config_dict)
-    return AutoConfig.from_pretrained(model_name)
+    spec_type = config_dict.get("speculators_model_type")
+    if spec_type is not None or "transformer_layer_config" in config_dict:
+        spec_type = spec_type or "dspark"
+        if spec_type != algo:
+            raise ValueError(
+                f"Draft checkpoint {model_name} is a speculators "
+                f"{spec_type!r} model but policy.draft.algo={algo!r}."
+            )
+        if algo == "eagle3":
+            return _adapt_speculators_eagle3_config(
+                config_dict, model_name, target_num_hidden_layers
+            )
+        return _adapt_speculators_dspark_config(config_dict, algo=algo)
+    if algo == "eagle3":
+        raise ValueError(
+            f"Draft checkpoint {model_name} is not speculators-format; only "
+            "speculators-format eagle3 checkpoints are supported on the "
+            "DTensor-v2 path."
+        )
+    flat_config = AutoConfig.from_pretrained(model_name)
+    if not hasattr(flat_config, "sample_from_anchor"):
+        # Flat checkpoints come from the vendored trainer itself, whose blocks
+        # always use the next-token supervision layout.
+        flat_config.sample_from_anchor = True
+    return flat_config
 
 
-def _adapt_speculators_dspark_config(config_dict: dict[str, Any]) -> Any:
-    """Map a speculators-format dspark config onto the flat vendored layout."""
+def load_dspark_draft_hf_config(model_name: str) -> Any:
+    """Backward-compatible alias for the dspark algo."""
+    return load_draft_hf_config(model_name, algo="dspark")
+
+
+def _adapt_speculators_dspark_config(
+    config_dict: dict[str, Any], algo: str = "dspark"
+) -> Any:
+    """Map a speculators-format dspark/dflash config onto the vendored layout."""
     from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
 
     layer_cfg = dict(config_dict["transformer_layer_config"])
     model_type = layer_cfg.pop("model_type", "qwen3")
     if model_type != "qwen3":
         raise ValueError(
-            "Speculators dspark adapter only supports qwen3 draft transformers, "
+            f"Speculators {algo} adapter only supports qwen3 draft transformers, "
             f"got transformer_layer_config.model_type={model_type!r}."
         )
     adapted = Qwen3Config(**layer_cfg)
     adapted.architectures = list(
-        config_dict.get("architectures") or ["Qwen3DSparkModel"]
+        config_dict.get("architectures")
+        or (["DFlashDraftModel"] if algo == "dflash" else ["Qwen3DSparkModel"])
     )
+    if "block_size" not in config_dict or "mask_token_id" not in config_dict:
+        raise ValueError(
+            f"Speculators {algo} checkpoint config is missing block_size or "
+            f"mask_token_id (checkpoint architectures: {adapted.architectures})."
+        )
+    # The speculators block_size counts SLOTS (anchor + mask positions), the
+    # same meaning as the vendored trainer's block_size, so it passes through
+    # unchanged. What differs between the families is the supervision layout:
+    # dspark (sample_from_anchor=True) supervises every slot on the NEXT
+    # token, dflash (False) leaves the anchor slot unsupervised and each mask
+    # slot predicts the token AT its own position — matching vLLM's dflash
+    # speculator (1 + N query slots, ``sample_pos = query_pos``).
+    sample_from_anchor = bool(config_dict.get("sample_from_anchor", algo == "dspark"))
+    adapted.sample_from_anchor = sample_from_anchor
     adapted.block_size = int(config_dict["block_size"])
     adapted.mask_token_id = int(config_dict["mask_token_id"])
     # Convention shift: speculators/vLLM aux_hidden_state_layer_ids follow
@@ -104,6 +158,80 @@ def _adapt_speculators_dspark_config(config_dict: dict[str, Any]) -> Any:
     return adapted
 
 
+def default_eagle3_aux_layer_ids_vllm(target_num_hidden_layers: int) -> list[int]:
+    """Default vLLM EAGLE3 aux layers for a target, in vLLM capture indexing.
+
+    Mirrors ``SupportsEagle3.get_eagle3_default_aux_hidden_state_layers``:
+    (2, N // 2, N - 3). The trainer capture uses these minus 1 (output-of-layer
+    convention).
+    """
+    n = int(target_num_hidden_layers)
+    return [2, n // 2, n - 3]
+
+
+def _adapt_speculators_eagle3_config(
+    config_dict: dict[str, Any],
+    model_name: str,
+    target_num_hidden_layers: Optional[int],
+) -> Any:
+    """Map a speculators-format eagle3 config onto the vendored layout."""
+    from transformers.models.llama.configuration_llama import LlamaConfig
+    from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
+
+    layer_cfg = dict(config_dict["transformer_layer_config"])
+    model_type = layer_cfg.pop("model_type", "qwen3")
+    # The layer family is architecture, not cosmetics: speculators publishes
+    # qwen3-target eagle3 drafts under the LLAMA model_type (no q/k norms —
+    # e.g. RedHatAI/Qwen3-8B-speculator.eagle3), and both speculators training
+    # and the pinned vLLM's serving drafter build llama-style layers for them.
+    # The vendored model dispatches on model_type the same way.
+    if model_type == "llama":
+        adapted = LlamaConfig(**layer_cfg)
+    elif model_type == "qwen3":
+        adapted = Qwen3Config(**layer_cfg)
+    else:
+        raise ValueError(
+            "Speculators eagle3 adapter only supports qwen3/llama draft "
+            f"transformers, got transformer_layer_config.model_type="
+            f"{model_type!r} for {model_name}."
+        )
+    adapted._attn_implementation = "sdpa"
+    adapted.architectures = list(
+        config_dict.get("architectures") or ["Eagle3Speculator"]
+    )
+    if not config_dict.get("draft_vocab_size"):
+        raise ValueError(
+            f"Speculators eagle3 checkpoint {model_name} config is missing "
+            "draft_vocab_size."
+        )
+    adapted.draft_vocab_size = int(config_dict["draft_vocab_size"])
+    if "norm_before_residual" not in config_dict:
+        raise ValueError(
+            f"Speculators eagle3 checkpoint {model_name} config is missing "
+            "norm_before_residual; refusing to guess the first-layer residual "
+            "convention."
+        )
+    adapted.norm_before_residual = bool(config_dict["norm_before_residual"])
+
+    # Aux capture layers: pinned ids from the checkpoint when present, else
+    # the same default selection vLLM applies for this target at serving
+    # time; either way convert from vLLM indexing (id j = output of layer
+    # j-1, 0 = embedding) to the trainer's output-of-layer convention.
+    aux_ids = config_dict.get("eagle_aux_hidden_state_layer_ids") or config_dict.get(
+        "aux_hidden_state_layer_ids"
+    )
+    if not aux_ids:
+        if target_num_hidden_layers is None:
+            raise ValueError(
+                f"Speculators eagle3 checkpoint {model_name} pins no aux layer "
+                "ids and no target layer count was provided to derive vLLM's "
+                "default selection."
+            )
+        aux_ids = default_eagle3_aux_layer_ids_vllm(target_num_hidden_layers)
+    adapted.target_layer_ids = [int(i) - 1 for i in aux_ids]
+    return adapted
+
+
 class PolicyWithDraft(nn.Module):
     """Composite module pairing the policy and draft for optimizer state I/O.
 
@@ -124,9 +252,14 @@ class PolicyWithDraft(nn.Module):
 
 
 def validate_dspark_draft_config(
-    draft_hf_config: Any, dspark_options: dict[str, Any]
+    draft_hf_config: Any, dspark_options: dict[str, Any], algo: str = "dspark"
 ) -> None:
-    """Validate the draft checkpoint's config.json against the training options."""
+    """Validate a dspark/dflash checkpoint's config against the training options.
+
+    DFlash is the markov-free, confidence-free subset of DSpark: the same
+    vendored model runs both, but a dflash run must not silently pick up
+    markov/confidence behavior (or vice versa expect heads that don't exist).
+    """
     missing = [
         field
         for field in DSPARK_REQUIRED_CONFIG_FIELDS
@@ -134,17 +267,54 @@ def validate_dspark_draft_config(
     ]
     if missing:
         raise ValueError(
-            f"DSpark draft checkpoint config.json is missing required fields: {missing}. "
-            "Expected a checkpoint produced by DSpark training (e.g. "
+            f"{algo} draft checkpoint config.json is missing required fields: {missing}. "
+            "Expected a checkpoint produced by DSpark/DFlash training (e.g. "
             "deepseek-ai/dspark_qwen3_8b_block7)."
         )
     architectures = getattr(draft_hf_config, "architectures", None) or []
-    if "Qwen3DSparkModel" not in architectures:
+    accepted_archs = {
+        # deepseek exports both families under the DSpark class name.
+        "dspark": ("Qwen3DSparkModel",),
+        "dflash": ("DFlashDraftModel", "Qwen3DSparkModel"),
+    }[algo]
+    if not any(arch in architectures for arch in accepted_archs):
         raise ValueError(
-            "DSpark draft checkpoint must declare architectures=['Qwen3DSparkModel'], "
-            f"got {architectures}. Only Qwen3-family DSpark drafts are supported."
+            f"{algo} draft checkpoint must declare one of {list(accepted_archs)} "
+            f"architectures, got {architectures}. Only Qwen3-family drafts are "
+            "supported."
+        )
+    sample_from_anchor = bool(getattr(draft_hf_config, "sample_from_anchor", True))
+    if algo == "dspark" and not sample_from_anchor:
+        raise ValueError(
+            "policy.draft.algo=dspark requires the next-token block layout "
+            "(sample_from_anchor=true), but the checkpoint uses the dflash "
+            "bonus-anchor layout; run it as algo=dflash instead."
+        )
+    if algo == "dflash" and sample_from_anchor:
+        raise ValueError(
+            "policy.draft.algo=dflash requires the bonus-anchor block layout "
+            "(sample_from_anchor=false), but the checkpoint uses the "
+            "next-token layout; run it as algo=dspark instead."
         )
     confidence_alpha = float(dspark_options["confidence_loss_alpha"])
+    if algo == "dflash":
+        if int(getattr(draft_hf_config, "markov_rank", 0) or 0) > 0:
+            raise ValueError(
+                "policy.draft.algo=dflash but the checkpoint carries a Markov "
+                f"head (markov_rank={draft_hf_config.markov_rank}); run it as "
+                "algo=dspark instead."
+            )
+        if bool(getattr(draft_hf_config, "enable_confidence_head", False)):
+            raise ValueError(
+                "policy.draft.algo=dflash but the checkpoint carries a "
+                "confidence head; run it as algo=dspark instead."
+            )
+        if confidence_alpha != 0:
+            raise ValueError(
+                "policy.draft.algo=dflash requires "
+                "policy.draft.dspark.confidence_loss_alpha=0 (DFlash has no "
+                f"confidence head), got {confidence_alpha}."
+            )
     if confidence_alpha > 0 and not bool(
         getattr(draft_hf_config, "enable_confidence_head", False)
     ):
@@ -167,10 +337,11 @@ def build_dspark_draft_model(
     dspark_options: dict[str, Any],
     torch_dtype: torch.dtype,
     mesh: Any,
+    algo: str = "dspark",
 ) -> Qwen3DSparkModel:
-    """Build, validate, and FSDP2-shard the DSpark draft from a pretrained checkpoint."""
-    draft_hf_config = load_dspark_draft_hf_config(model_name)
-    validate_dspark_draft_config(draft_hf_config, dspark_options)
+    """Build, validate, and FSDP2-shard a dspark/dflash draft from a checkpoint."""
+    draft_hf_config = load_draft_hf_config(model_name, algo=algo)
+    validate_dspark_draft_config(draft_hf_config, dspark_options, algo=algo)
     # num_anchors is a training-time knob, not checkpoint architecture; the
     # flex-attention implementation is required by the training block mask.
     draft_hf_config.num_anchors = int(dspark_options["num_anchors"])
@@ -186,6 +357,48 @@ def build_dspark_draft_model(
     draft_model.requires_grad_(True)
     train_embed_and_head = bool(dspark_options["train_embed_and_head"])
     draft_model.set_embedding_head_trainable(train_embed_and_head)
+
+    from torch.distributed.fsdp import fully_shard
+
+    for layer in draft_model.layers:
+        fully_shard(layer, mesh=mesh)
+    fully_shard(draft_model, mesh=mesh)
+    return draft_model
+
+
+def build_eagle3_draft_model(
+    model_name: str,
+    eagle3_options: "Eagle3DraftOptions",
+    torch_dtype: torch.dtype,
+    mesh: Any,
+    target_num_hidden_layers: int,
+) -> Qwen3Eagle3DraftModel:
+    """Build, validate, and FSDP2-shard an EAGLE3 draft from a checkpoint."""
+    draft_hf_config = load_draft_hf_config(
+        model_name, algo="eagle3", target_num_hidden_layers=target_num_hidden_layers
+    )
+    accepted_archs = ("Eagle3Speculator", "Qwen3Eagle3DraftModel")
+    architectures = getattr(draft_hf_config, "architectures", None) or []
+    if not any(arch in architectures for arch in accepted_archs):
+        raise ValueError(
+            f"eagle3 draft checkpoint must declare one of {list(accepted_archs)} "
+            f"architectures, got {architectures}."
+        )
+    if int(eagle3_options.ttt_steps) < 1:
+        raise ValueError(
+            f"policy.draft.eagle3.ttt_steps must be >= 1, got "
+            f"{eagle3_options.ttt_steps}."
+        )
+
+    draft_model = Qwen3Eagle3DraftModel.from_pretrained(
+        model_name,
+        config=draft_hf_config,
+        torch_dtype=torch_dtype,
+    )
+    draft_model = draft_model.to("cuda")
+
+    draft_model.requires_grad_(True)
+    draft_model.set_embedding_head_trainable(bool(eagle3_options.train_embed_and_head))
 
     from torch.distributed.fsdp import fully_shard
 
@@ -517,14 +730,188 @@ class DSparkRuntime:
 
 
 @contextlib.contextmanager
-def dspark_capture_ctx(runtime: "DSparkRuntime"):
-    """Keep the hidden-capture hooks active for the duration of a train call."""
+def dspark_capture_ctx(runtime: Any):
+    """Keep the hidden-capture hooks active for the duration of a train call.
+
+    Works for any draft runtime exposing ``capture`` (dspark/dflash/eagle3).
+    """
     assert runtime.capture is not None, "attach_capture must run before training."
     runtime.capture.activate()
     try:
         yield
     finally:
         runtime.capture.deactivate()
+
+
+# Alias reflecting the runtime-agnostic contract; dspark_capture_ctx is kept
+# for backward compatibility.
+draft_capture_ctx = dspark_capture_ctx
+
+
+class Eagle3Runtime:
+    """Per-worker EAGLE3 co-training state: draft model, capture, TTT loss.
+
+    Exposes the same runtime protocol as DSparkRuntime
+    (attach_capture / begin_global_batch / stash_teacher_logits /
+    compute_loss) so the worker and loss wrapper treat all draft algos
+    uniformly.
+    """
+
+    def __init__(
+        self,
+        draft_model: Qwen3Eagle3DraftModel,
+        eagle3_options: Eagle3DraftOptions,
+        loss_weight: float,
+        dp_group: Optional[dist.ProcessGroup],
+        tp_group: Optional[dist.ProcessGroup] = None,
+        cp_group: Optional[dist.ProcessGroup] = None,
+    ):
+        self.draft_model = draft_model
+        self.options = eagle3_options
+        self.loss_weight = float(loss_weight)
+        self.dp_group = dp_group
+        self.tp_group = tp_group
+        self.cp_group = cp_group
+        self.capture: Optional[DSparkHiddenCapture] = None
+        self._teacher_logits: Optional[torch.Tensor] = None
+        self._num_microbatch_slots: int = 1
+
+    @property
+    def _cp_size(self) -> int:
+        return dist.get_world_size(self.cp_group) if self.cp_group is not None else 1
+
+    def begin_global_batch(self, num_microbatch_slots: int) -> None:
+        """See DSparkRuntime.begin_global_batch (same slot normalization)."""
+        self._num_microbatch_slots = max(int(num_microbatch_slots), 1)
+
+    def attach_capture(self, policy_model: nn.Module) -> None:
+        if self.capture is None:
+            self.capture = DSparkHiddenCapture(
+                policy_model, list(self.draft_model.target_layer_ids)
+            )
+
+    def stash_teacher_logits(
+        self, logits: torch.Tensor, will_scale_inplace: bool
+    ) -> None:
+        """Record the policy's raw logits (see DSparkRuntime for semantics)."""
+        if not isinstance(logits, DTensor) and self.tp_group is not None:
+            if dist.get_world_size(self.tp_group) > 1:
+                raise RuntimeError(
+                    "EAGLE3 co-training with tensor_parallel_size > 1 expects the "
+                    "policy logits as a vocab-sharded DTensor, but got a plain "
+                    f"{type(logits).__name__}."
+                )
+        raw = logits.detach()
+        self._teacher_logits = raw.clone() if will_scale_inplace else raw
+
+    def compute_loss(self, data_dict: Any) -> tuple[torch.Tensor, dict[str, float]]:
+        """Run the TTT draft forward on captured hiddens and compute the loss."""
+        if self.capture is None or not self.capture.active:
+            raise RuntimeError(
+                "EAGLE3 loss requested but hidden capture is not active; the "
+                "worker must activate capture around the training forward."
+            )
+        teacher_logits = self._teacher_logits
+        if teacher_logits is None:
+            raise RuntimeError(
+                "EAGLE3 loss requested but no teacher logits were stashed for "
+                "this microbatch."
+            )
+        if isinstance(teacher_logits, DTensor):
+            teacher_logits = teacher_logits.full_tensor()
+        # Map the teacher into draft-vocab order before any CP gather so the
+        # gathered tensor is draft_vocab wide, not target_vocab wide.
+        teacher_logits = teacher_logits.index_select(
+            -1, self.draft_model.get_d2t_target_ids().to(teacher_logits.device)
+        )
+
+        fused_hidden = self.capture.collect()
+
+        input_ids = data_dict["input_ids"]
+        if isinstance(input_ids, DTensor):
+            # CP loss prep wraps the load-balanced local shard with a nominal
+            # contiguous placement; take the local and restore order below.
+            input_ids = input_ids.to_local()
+        if "input_lengths" not in data_dict:
+            raise RuntimeError(
+                "EAGLE3 co-training requires input_lengths in the microbatch to "
+                "mark padding for the packed-row document mask."
+            )
+        input_lengths = data_dict["input_lengths"].to(fused_hidden.device)
+        loss_mask = data_dict["token_mask"].float()
+        if "sample_mask" in data_dict:
+            loss_mask = loss_mask * data_dict["sample_mask"].float().unsqueeze(-1)
+
+        if self._cp_size > 1:
+            from nemo_rl.distributed.model_utils import allgather_cp_sharded_tensor
+
+            teacher_logits = allgather_cp_sharded_tensor(
+                teacher_logits, self.cp_group, seq_dim=1
+            )
+            fused_hidden = allgather_cp_sharded_tensor(
+                fused_hidden, self.cp_group, seq_dim=1
+            )
+            if input_ids.size(1) != loss_mask.size(1):
+                input_ids = allgather_cp_sharded_tensor(
+                    input_ids, self.cp_group, seq_dim=1
+                )
+
+        batch_size, seq_len = input_ids.shape
+        device = input_ids.device
+
+        # Flatten the padded batch into one packed row: document ids separate
+        # the sequences in the attention mask (padding marked -1) and
+        # per-sequence position ids restart at 1, matching the speculators
+        # packed-row layout.
+        positions = torch.arange(seq_len, device=device).unsqueeze(0)
+        valid = positions < input_lengths.unsqueeze(1)
+        document_ids = torch.where(
+            valid,
+            torch.arange(batch_size, device=device).unsqueeze(1),
+            torch.full_like(positions.expand(batch_size, -1), -1),
+        )
+        position_ids = (1 + positions).expand(batch_size, -1)
+
+        total = batch_size * seq_len
+        terms = self.draft_model(
+            fused_hidden_states=fused_hidden.reshape(1, total, -1),
+            input_ids=input_ids.reshape(1, total),
+            document_ids=document_ids.reshape(1, total),
+            loss_mask=(loss_mask > 0.5).reshape(1, total),
+            teacher_logits=teacher_logits.reshape(1, total, -1),
+            position_ids=position_ids.reshape(1, total),
+            ttt_steps=int(self.options.ttt_steps),
+        )
+
+        decay = float(self.options.ttt_step_loss_decay)
+        loss = fused_hidden.new_zeros((), dtype=torch.float32)
+        metrics: dict[str, float] = {}
+        for step, (num, den) in enumerate(zip(terms.loss_nums, terms.loss_dens)):
+            den_global = den.detach().clone()
+            if self.dp_group is not None and dist.is_initialized():
+                dist.all_reduce(den_global, group=self.dp_group)
+            loss = loss + (decay**step) * num / den_global
+            metrics[f"draft_ttt_loss@{step}"] = float((num / den).item())
+            full_den = float(terms.full_acc_dens[step].item())
+            cond_den = float(terms.cond_acc_dens[step].item())
+            metrics[f"draft_full_acc@{step}"] = (
+                float(terms.full_acc_nums[step].item()) / full_den
+                if full_den > 0
+                else 0.0
+            )
+            metrics[f"draft_cond_acc@{step}"] = (
+                float(terms.cond_acc_nums[step].item()) / cond_den
+                if cond_den > 0
+                else 0.0
+            )
+        metrics["draft_loss"] = float(loss.item())
+        # See DSparkRuntime.begin_global_batch: average across microbatch
+        # slots so the summed backward keeps a global-mean gradient scale.
+        loss = loss / self._num_microbatch_slots
+
+        self._teacher_logits = None
+        self.capture.clear()
+        return loss, metrics
 
 
 DSPARK_OPTIMIZER_GROUP_NAMES = ("policy", "draft")
@@ -552,19 +939,58 @@ def optimizer_layout_record(
     ]
 
 
+DRAFT_META_VERSION = 1
+
+
+def draft_meta_record(
+    draft_model: nn.Module,
+    model_name: str,
+    optimizer: Optional[torch.optim.Optimizer],
+    algo: str = "dspark",
+    train_embed_and_head: Optional[bool] = None,
+) -> dict[str, Any]:
+    """Versioned per-algo draft checkpoint metadata.
+
+    Legacy dspark checkpoints predate versioning (no meta_version/algo); the
+    validator treats those as dspark/v0.
+    """
+    config = draft_model.config
+    record: dict[str, Any] = {
+        "meta_version": DRAFT_META_VERSION,
+        "algo": algo,
+        "model_name": model_name,
+        "train_embed_and_head": train_embed_and_head,
+        "optimizer_layout": optimizer_layout_record(optimizer) if optimizer else None,
+    }
+    if algo in ("dspark", "dflash"):
+        record.update(
+            {
+                "block_size": int(config.block_size),
+                "mask_token_id": int(config.mask_token_id),
+                "target_layer_ids": [int(i) for i in config.target_layer_ids],
+                "draft_vocab_size": getattr(config, "draft_vocab_size", None),
+                "sample_from_anchor": bool(getattr(config, "sample_from_anchor", True)),
+            }
+        )
+    elif algo == "eagle3":
+        record.update(
+            {
+                "aux_layer_ids": [int(i) for i in config.target_layer_ids],
+                "draft_vocab_size": int(config.draft_vocab_size),
+            }
+        )
+    else:
+        raise ValueError(f"Unknown draft algo {algo!r} for checkpoint metadata.")
+    return record
+
+
 def dspark_meta_record(
     draft_model: Qwen3DSparkModel,
     model_name: str,
     optimizer: Optional[torch.optim.Optimizer],
 ) -> dict[str, Any]:
-    config = draft_model.config
-    return {
-        "model_name": model_name,
-        "block_size": int(config.block_size),
-        "mask_token_id": int(config.mask_token_id),
-        "target_layer_ids": [int(i) for i in config.target_layer_ids],
-        "optimizer_layout": optimizer_layout_record(optimizer) if optimizer else None,
-    }
+    """Backward-compatible alias building dspark metadata."""
+    return draft_meta_record(draft_model, model_name, optimizer, algo="dspark")
 
 
 def draft_checkpoint_dir(weights_path: str) -> str:
@@ -582,7 +1008,7 @@ def draft_checkpoint_dir(weights_path: str) -> str:
 
 
 def save_draft_checkpoint(
-    draft_model: Qwen3DSparkModel,
+    draft_model: nn.Module,
     weights_path: str,
     meta: dict[str, Any],
 ) -> None:
@@ -611,20 +1037,38 @@ def validate_dspark_checkpoint_meta(
     logprob-only workers) legitimately carry no layout while training
     checkpoints do.
     """
-    keys = ["block_size", "mask_token_id", "target_layer_ids"]
+    # Legacy dspark metadata predates versioning: missing algo means dspark,
+    # missing meta_version means v0. Never resume across algos.
+    saved_algo = saved_meta.get("algo", "dspark")
+    expected_algo = expected_meta.get("algo", "dspark")
+    if saved_algo != expected_algo:
+        raise ValueError(
+            f"Draft checkpoint metadata algo mismatch: checkpoint has "
+            f"{saved_algo!r}, current run expects {expected_algo!r}. "
+            "Refusing to resume with an inconsistent draft configuration."
+        )
+    if expected_algo == "eagle3":
+        keys = ["aux_layer_ids", "draft_vocab_size"]
+    else:
+        keys = ["block_size", "mask_token_id", "target_layer_ids"]
+        # draft_vocab_size and sample_from_anchor were added with versioning;
+        # only compare when the checkpoint recorded them.
+        for versioned_key in ("draft_vocab_size", "sample_from_anchor"):
+            if versioned_key in saved_meta:
+                keys.append(versioned_key)
     if expected_meta.get("optimizer_layout") is not None:
         keys.append("optimizer_layout")
     for key in keys:
         if saved_meta.get(key) != expected_meta.get(key):
             raise ValueError(
-                f"DSpark checkpoint metadata mismatch for '{key}': checkpoint has "
+                f"Draft checkpoint metadata mismatch for '{key}': checkpoint has "
                 f"{saved_meta.get(key)!r}, current run expects {expected_meta.get(key)!r}. "
                 "Refusing to resume with an inconsistent draft configuration."
             )
 
 
 def load_draft_checkpoint(
-    draft_model: Qwen3DSparkModel,
+    draft_model: nn.Module,
     weights_path: str,
     expected_meta: dict[str, Any],
 ) -> None:
@@ -653,13 +1097,14 @@ def load_draft_checkpoint(
 def load_dspark_checkpoint(
     checkpoint_manager: Any,
     model: nn.Module,
-    draft_model: Qwen3DSparkModel,
+    draft_model: nn.Module,
     composite_model: nn.Module,
     optimizer: Optional[torch.optim.Optimizer],
     scheduler: Any,
     weights_path: str,
     optimizer_path: Optional[str],
     model_name: str,
+    algo: str = "dspark",
 ) -> None:
     """Load a dspark checkpoint with the composite-optimizer pairing rule.
 
@@ -673,7 +1118,7 @@ def load_dspark_checkpoint(
     load_draft_checkpoint(
         draft_model,
         weights_path,
-        expected_meta=dspark_meta_record(draft_model, model_name, optimizer),
+        expected_meta=draft_meta_record(draft_model, model_name, optimizer, algo=algo),
     )
     if optimizer_path and optimizer is not None:
         checkpoint_manager.checkpointer.load_optimizer(

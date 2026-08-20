@@ -14,6 +14,8 @@
 
 from typing import Any, Literal, NotRequired, TypedDict, Union
 
+from pydantic import BaseModel
+
 from nemo_rl.models.generation.interfaces import GenerationConfig
 from nemo_rl.utils.checkpoint import PretrainedCheckpointConfig
 
@@ -485,21 +487,50 @@ class DSparkDraftOptions(TypedDict):
     train_embed_and_head: bool
 
 
+class Eagle3DraftOptions(BaseModel, extra="allow"):
+    """Training options for EAGLE3 draft co-training (DTensor-v2 backend only).
+
+    Architecture fields (hidden sizes, draft vocab, d2t/t2d maps) are read
+    from the draft checkpoint's config.json; the auxiliary capture layers are
+    derived from the target model with the same selection vLLM uses and are
+    intentionally not configurable here.
+    """
+
+    # Learning rate for the draft's optimizer param group; like dspark, the
+    # draft needs a much higher rate than the policy's RL lr to track the
+    # policy's distribution drift.
+    learning_rate: float = 1.0e-4
+    # Test-time-training unroll depth: the draft re-consumes its own context
+    # for this many steps per training forward (speculators default).
+    ttt_steps: int = 3
+    # Per-unroll-step loss decay factor (1.0 keeps all steps equally
+    # weighted, matching the speculators default).
+    ttt_step_loss_decay: float = 1.0
+    # Train the draft's embed_tokens/lm_head (streamed on every refit)
+    # instead of keeping the checkpoint copies frozen.
+    train_embed_and_head: bool = True
+
+
 class DraftConfig(TypedDict):
     """Configuration for draft-model co-training alongside the policy model.
 
-    algo selects the drafter family: "eagle3" (Megatron backend) or "dspark"
-    (DTensor-v2 backend). num_layers/aux_layer_indices apply to eagle3 only;
-    dspark carries its options in the dspark sub-block.
+    algo selects the drafter family: "eagle3" (Megatron backend, or DTensor-v2
+    with TTT training), "dspark", or "dflash" (both DTensor-v2).
+    num_layers/aux_layer_indices apply to the Megatron eagle3 path only;
+    dspark and dflash carry their options in the dspark sub-block (dflash is
+    the markov-free/confidence-free subset, so confidence_loss_alpha must be
+    0), and the DTensor-v2 eagle3 path carries its options in the eagle3
+    sub-block.
     """
 
     enabled: Literal[True]
     model_name: NotRequired[str | None]
     loss_weight: NotRequired[float]
-    algo: NotRequired[Literal["eagle3", "dspark"]]
+    algo: NotRequired[Literal["eagle3", "dspark", "dflash"]]
     num_layers: NotRequired[int | None]
     aux_layer_indices: NotRequired[list[int] | None]
     dspark: NotRequired[DSparkDraftOptions]
+    eagle3: NotRequired[Eagle3DraftOptions]
 
 
 class TokenizerConfig(TypedDict):

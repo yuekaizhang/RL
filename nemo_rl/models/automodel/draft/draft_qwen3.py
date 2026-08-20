@@ -291,6 +291,13 @@ class Qwen3DSparkModel(Qwen3PreTrainedModel):
         self.block_size = int(config.block_size)
         self.mask_token_id = config.mask_token_id
         self.num_anchors = int(config.num_anchors)
+        # Supervision layout. True (dspark, and the flat deepseek checkpoints
+        # this trainer was vendored for): every block slot predicts the NEXT
+        # token (slot at position p emits the distribution for p + 1). False
+        # (speculators dflash): the anchor slot is an unsupervised bonus token
+        # and each mask slot predicts the token AT its own position, matching
+        # vLLM's dflash speculator (``sample_pos = query_pos``).
+        self.sample_from_anchor = bool(getattr(config, "sample_from_anchor", True))
 
         # Markov head.
         self.markov_head = build_markov_head(config)
@@ -554,9 +561,13 @@ class Qwen3DSparkModel(Qwen3PreTrainedModel):
         num_blocks = anchor_positions.size(1)
         output_hidden_4d = output_hidden.reshape(bsz, num_blocks, self.block_size, -1)
 
-        label_offsets = torch.arange(1, self.block_size + 1, device=device).view(
-            1, 1, -1
-        )
+        # Next-token layout (dspark): slot k is supervised on the token at
+        # anchor + k + 1. At-position layout (dflash): slot k is supervised on
+        # the token at anchor + k, with the anchor slot (k = 0) unsupervised.
+        first_label_offset = 1 if self.sample_from_anchor else 0
+        label_offsets = torch.arange(
+            first_label_offset, first_label_offset + self.block_size, device=device
+        ).view(1, 1, -1)
         label_indices = anchor_positions.unsqueeze(-1) + label_offsets
         safe_label_indices = label_indices.clamp(max=seq_len - 1)
         safe_label_indices = torch.where(
@@ -628,6 +639,7 @@ class Qwen3DSparkModel(Qwen3PreTrainedModel):
             block_keep_mask=block_keep_mask,
             doc_remaining=doc_remaining if packed else None,
             anchor_positions=anchor_positions if packed else None,
+            supervised_from_slot=0 if self.sample_from_anchor else 1,
         )
         if in_draft_vocab is not None:
             eval_mask = eval_mask & in_draft_vocab

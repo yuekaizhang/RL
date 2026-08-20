@@ -227,7 +227,17 @@ def build_eval_mask(
     block_keep_mask: torch.Tensor,
     doc_remaining: Optional[torch.Tensor] = None,
     anchor_positions: Optional[torch.Tensor] = None,
+    supervised_from_slot: int = 0,
 ) -> torch.Tensor:
+    """Per-slot supervision mask for the anchored blocks.
+
+    ``supervised_from_slot`` marks the first supervised block slot: 0 when the
+    anchor slot itself predicts (dspark next-token layout), 1 when the anchor is
+    an unsupervised bonus token (dflash at-position layout). Leading
+    unsupervised slots are treated as valid links for the trailing cumprod
+    (their label — the anchor's own token — may sit outside the loss mask
+    without invalidating the rest of the block) and are zeroed afterwards.
+    """
     target_valid = label_indices < seq_len
     target_loss_mask = torch.gather(
         loss_mask.unsqueeze(1).expand(-1, label_indices.size(1), -1),
@@ -237,20 +247,23 @@ def build_eval_mask(
     eval_mask = target_valid & (target_loss_mask > 0.5)
     eval_mask = eval_mask & block_keep_mask.unsqueeze(-1)
     if doc_remaining is not None:
-        # Packing: truncate each block at its anchor's document boundary. The k-th
-        # block slot (0-indexed) predicts token ``anchor + k + 1``, which stays in
-        # the document iff ``k + 1 <= doc_remaining[anchor]``. The trailing cumprod
-        # then drops every slot at or beyond the boundary (a partial in-document
-        # block), matching how the block is truncated at the sequence end.
-        block_size = label_indices.size(-1)
-        step = torch.arange(1, block_size + 1, device=label_indices.device).view(
-            1, 1, -1
-        )
+        # Packing: truncate each block at its anchor's document boundary. Slot k
+        # predicts the token at ``anchor + offset_k`` (offset_k = label_indices
+        # - anchor), which stays in the document iff ``offset_k <=
+        # doc_remaining[anchor]``. The trailing cumprod then drops every slot at
+        # or beyond the boundary (a partial in-document block), matching how
+        # the block is truncated at the sequence end.
+        step = label_indices - anchor_positions.unsqueeze(-1)
         anchor_remaining = torch.gather(doc_remaining, 1, anchor_positions).unsqueeze(
             -1
         )
         eval_mask = eval_mask & (step <= anchor_remaining)
-    return eval_mask.to(torch.int32).cumprod(dim=-1).bool()
+    if supervised_from_slot > 0:
+        eval_mask[..., :supervised_from_slot] = True
+    eval_mask = eval_mask.to(torch.int32).cumprod(dim=-1).bool()
+    if supervised_from_slot > 0:
+        eval_mask[..., :supervised_from_slot] = False
+    return eval_mask
 
 
 def create_position_ids(

@@ -456,26 +456,27 @@ class BaseVllmGenerationWorker:
             and not mtp_weights_from_refit
         )
 
-        # DSpark co-training refits the drafter's trained embed_tokens/lm_head.
-        # Under load_format="dummy" the pinned vLLM would alias those drafter
-        # modules to the target model's (no checkpoint load ever marks them as
-        # owned), and the draft refit would then overwrite the policy's serving
-        # weights through the alias. Disable the sharing before engine creation;
-        # the env flag re-applies it in any spawned vLLM executor worker.
+        # Draft co-training (dspark/dflash/eagle3) refits the drafter's trained
+        # embed_tokens/lm_head. Under load_format="dummy" the pinned vLLM would
+        # alias those drafter modules to the target model's (no checkpoint load
+        # ever marks them as owned), and the draft refit would then overwrite
+        # the policy's serving weights through the alias. Disable the sharing
+        # before engine creation; the env flag re-applies it in any spawned
+        # vLLM executor worker.
         if (
             load_format == "dummy"
             and spec_cfg is not None
-            and spec_cfg.get("method") == "dspark"
+            and spec_cfg.get("method") in ("dspark", "dflash", "eagle3")
         ):
             # Deferred import: vllm_backend imports vllm eagerly, which only
             # this vLLM-venv worker process should pay for.
             from nemo_rl.models.generation.vllm.vllm_backend import (
-                DSPARK_DISABLE_DRAFT_MODULE_SHARING_ENV,
-                disable_dspark_draft_module_sharing,
+                DRAFT_DISABLE_MODULE_SHARING_ENV,
+                disable_draft_module_sharing,
             )
 
-            os.environ[DSPARK_DISABLE_DRAFT_MODULE_SHARING_ENV] = "1"
-            disable_dspark_draft_module_sharing()
+            os.environ[DRAFT_DISABLE_MODULE_SHARING_ENV] = "1"
+            disable_draft_module_sharing()
 
         if (
             len(get_nsight_config_if_pattern_matches("vllm_generation_worker")) > 0

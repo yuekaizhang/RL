@@ -60,45 +60,70 @@ except ImportError:
 WeightUpdateTransport = Literal["ipc", "collective"]
 WeightUpdateFinalizer = Callable[[], None]
 
-# Env flag that requests disable_dspark_draft_module_sharing() at import time in
+# Speculative methods whose drafter is co-trained by the trainer and refit
+# through the ``draft.*`` weight stream (dspark/dflash block drafters and the
+# eagle3 TTT drafter). MTP is co-trained too but streams without the prefix.
+COTRAINED_SPECULATIVE_METHODS = ("dspark", "dflash", "eagle3")
+
+# Env flag that requests disable_draft_module_sharing() at import time in
 # every process that resolves this module (the driver actor and any spawned
 # vLLM executor workers, which import it for worker_extension_cls before
 # loading the model).
-DSPARK_DISABLE_DRAFT_MODULE_SHARING_ENV = "NRL_DSPARK_DISABLE_DRAFT_MODULE_SHARING"
+DRAFT_DISABLE_MODULE_SHARING_ENV = "NRL_DRAFT_DISABLE_MODULE_SHARING"
+# Backwards-compatible alias from when only dspark was supported.
+DSPARK_DISABLE_DRAFT_MODULE_SHARING_ENV = DRAFT_DISABLE_MODULE_SHARING_ENV
 
 
-def disable_dspark_draft_module_sharing() -> None:
-    """Keep the DSpark drafter's embed_tokens/lm_head separate from the target's.
+def disable_draft_module_sharing() -> None:
+    """Keep the drafter's embed_tokens/lm_head separate from the target's.
 
-    The pinned vLLM's ``load_dspark_model`` aliases the drafter's embed_tokens
-    and lm_head modules to the target model's whenever the drafter's
-    ``load_weights`` has not marked them as owned — which is always the case
-    under ``load_format="dummy"``, where no checkpoint weights are read at
-    startup. With DSpark co-training the refit stream carries trained
+    The pinned vLLM's ``load_dspark_model`` / ``load_dflash_model`` /
+    ``load_eagle_model`` alias the drafter's embed_tokens and lm_head modules
+    to the target model's whenever the drafter's ``load_weights`` has not
+    marked them as owned — which is always the case under
+    ``load_format="dummy"``, where no checkpoint weights are read at startup.
+    With draft co-training the refit stream carries trained
     ``draft.embed_tokens`` / ``draft.lm_head`` weights, and loading them through
     the aliased modules silently replaces the POLICY model's serving embed and
     lm_head with the draft's. Forcing ``_should_share`` to False makes the
     drafter keep the modules it built in ``__init__``; refit fills them before
     the first generation, and CUDA graphs capture drafter-owned storage.
 
+    ``_should_share`` is defined in the eagle utils module and imported by
+    value into the dspark/dflash utils modules, so each module's global must
+    be rebound individually.
+
     Must run before engine creation (drafter load and CUDA-graph capture).
     """
+    from vllm.v1.worker.gpu.spec_decode.dflash import utils as dflash_utils
     from vllm.v1.worker.gpu.spec_decode.dspark import utils as dspark_utils
+    from vllm.v1.worker.gpu.spec_decode.eagle import utils as eagle_utils
 
     def _never_share(*args: Any, **kwargs: Any) -> bool:
         return False
 
+    eagle_utils._should_share = _never_share
     dspark_utils._should_share = _never_share
+    dflash_utils._should_share = _never_share
 
 
-if os.environ.get(DSPARK_DISABLE_DRAFT_MODULE_SHARING_ENV) == "1":
-    disable_dspark_draft_module_sharing()
+# Backwards-compatible alias from when only dspark was supported.
+disable_dspark_draft_module_sharing = disable_draft_module_sharing
 
-# Incoming DSpark stream keys the drafter's loader intentionally skips
-# (mask_embedding is a placeholder param, the confidence head is not wired
-# into inference, and t2d is training-only). They are tolerated as extras in
-# the refit manifest and excluded from the required key set.
-_DSPARK_SKIPPED_KEY_SUBSTRINGS = ("mask_embedding", "confidence_head", "t2d")
+
+if os.environ.get(DRAFT_DISABLE_MODULE_SHARING_ENV) == "1":
+    disable_draft_module_sharing()
+
+# Incoming draft stream keys each drafter's loader intentionally skips. They
+# are tolerated as extras in the refit manifest and excluded from the required
+# key set. dspark/dflash: mask_embedding is a placeholder param, the
+# confidence head is not wired into inference (dflash drafts never have one),
+# and t2d is training-only. eagle3: t2d is training-only.
+_DRAFT_SKIPPED_KEY_SUBSTRINGS = {
+    "dspark": ("mask_embedding", "confidence_head", "t2d"),
+    "dflash": ("mask_embedding", "confidence_head", "t2d"),
+    "eagle3": ("t2d",),
+}
 
 
 def _format_refit_key_error(label: str, keys: set[str]) -> str:
@@ -354,11 +379,59 @@ class VllmInternalWorkerExtension:
             self.zmq_socket.setsockopt(zmq.LINGER, 0)
             self.zmq_socket.connect(self.get_zmq_address())
 
+    def draft_refit_preflight_report(self) -> dict[str, Any]:
+        """JSON-safe snapshot of the drafter refit surface for preflight checks.
+
+        Used by ``tools/draft_verification/vllm_refit_preflight.py`` (via
+        ``collective_rpc``) to validate, inside the serving container, that the
+        drafter loaded, its expected ``draft.*`` key set matches the trainer's
+        stream, integer/bool buffers keep their dtype, and no embed/lm_head
+        storage is aliased to the target model.
+        """
+        method = self._speculative_method()
+        draft_model = self._get_drafter_model()
+        report: dict[str, Any] = {
+            "method": method,
+            "owns_speculator": self._draft_owns_speculator(),
+            "has_drafter": draft_model is not None,
+        }
+        if draft_model is None:
+            return report
+        report["expected_draft_keys"] = sorted(self._expected_draft_keys())
+        report["param_dtypes"] = {
+            name: str(param.dtype) for name, param in draft_model.named_parameters()
+        }
+
+        target_model = self.model_runner.model
+        target_lm = (
+            target_model.get_language_model()
+            if hasattr(target_model, "get_language_model")
+            else target_model
+        )
+
+        def _ptr(module: Any) -> Optional[int]:
+            return module.weight.data_ptr() if module is not None else None
+
+        draft_embed = _ptr(
+            getattr(getattr(draft_model, "model", None), "embed_tokens", None)
+        )
+        target_embed = _ptr(
+            getattr(getattr(target_lm, "model", None), "embed_tokens", None)
+        )
+        draft_head = _ptr(getattr(draft_model, "lm_head", None))
+        target_head = _ptr(getattr(target_lm, "lm_head", None))
+        report["embed_tokens_aliased"] = (
+            draft_embed is not None and draft_embed == target_embed
+        )
+        report["lm_head_aliased"] = draft_head is not None and draft_head == target_head
+        return report
+
     def prepare_refit_info(self, state_dict_info: dict[str, Any]) -> None:
         """Prepare state dict metadata for weight refitting and IPC streaming.
 
-        For DSpark speculative decoding, the trainer-provided ``draft.*`` keys
-        are validated here against the drafter's own loadable layout. Combined
+        For co-trained speculative decoding (dspark/dflash/eagle3), the
+        trainer-provided ``draft.*`` keys are validated here against the
+        drafter's own loadable layout. Combined
         with the per-refit manifests (the IPC path enforces every
         ``state_dict_info`` key exactly once, and the collective path iterates
         ``state_dict_info`` by construction), this proves on every transport
@@ -369,7 +442,7 @@ class VllmInternalWorkerExtension:
                 e.g. {tensor_name: (shape, dtype)}
         """
         self.state_dict_info = state_dict_info  # pyrefly: ignore[implicitly-defined-attribute]  This class does not define __init__ so assignments like this should be ignored
-        self._validate_dspark_refit_info(state_dict_info)
+        self._validate_draft_refit_info(state_dict_info)
 
     def prepare_sparse_delta_refit_info(
         self, state_dict_info: dict[str, tuple[tuple[int, ...], torch.dtype]]
@@ -469,14 +542,14 @@ class VllmInternalWorkerExtension:
         spec_config = getattr(self.model_runner.vllm_config, "speculative_config", None)
         return getattr(spec_config, "method", None) if spec_config else None
 
-    def _dspark_owns_speculator(self) -> bool:
-        """Whether this rank should own the DSpark speculator.
+    def _draft_owns_speculator(self) -> bool:
+        """Whether this rank should own the co-trained speculator.
 
         vLLM keeps the drafter on the last pipeline stage, so earlier stages
         legitimately have no speculator and must skip draft payloads; every
         rank owns it in single-stage layouts.
         """
-        if self._speculative_method() != "dspark":
+        if self._speculative_method() not in COTRAINED_SPECULATIVE_METHODS:
             return False
         try:
             return bool(get_pp_group().is_last_rank)
@@ -484,20 +557,22 @@ class VllmInternalWorkerExtension:
             # No initialized PP group (single-process layouts, unit tests).
             return True
 
-    def _dspark_expected_draft_keys(self) -> set[str]:
+    def _expected_draft_keys(self) -> set[str]:
         """Expected incoming ``draft.*`` keys derived from the drafter's layout.
 
-        Inverts ``Qwen3DSparkForCausalLM.load_weights``' name handling: trainer
-        names are prefixed with ``model.`` (except ``lm_head.*``, and ``d2t``
-        which maps to ``draft_id_to_target_id``), and fused parameters load
-        from their stacked components (qkv_proj <- q/k/v_proj,
-        gate_up_proj <- gate/up_proj). Parameters the loader never feeds from
-        the stream (see _DSPARK_SKIPPED_KEY_SUBSTRINGS) are excluded.
+        Inverts the drafter ``load_weights`` name handling shared by
+        ``Qwen3DSparkForCausalLM`` / ``DFlashQwen3ForCausalLM`` /
+        ``Eagle3Qwen3ForCausalLM``: trainer names are prefixed with ``model.``
+        (except ``lm_head.*``, and ``d2t`` which maps to
+        ``draft_id_to_target_id``), and fused parameters load from their
+        stacked components (qkv_proj <- q/k/v_proj, gate_up_proj <-
+        gate/up_proj). Parameters the loader never feeds from the stream (see
+        _DRAFT_SKIPPED_KEY_SUBSTRINGS) are excluded.
         """
         draft_model = self._get_drafter_model()
         if draft_model is None:
             raise RuntimeError(
-                "[draft] DSpark refit validation requires the drafter model, but "
+                "[draft] Draft refit validation requires the drafter model, but "
                 "none was found at model_runner.drafter.model or "
                 "model_runner.speculator.model on a speculator-owning rank."
             )
@@ -505,9 +580,10 @@ class VllmInternalWorkerExtension:
             "qkv_proj": ("q_proj", "k_proj", "v_proj"),
             "gate_up_proj": ("gate_proj", "up_proj"),
         }
+        skipped = _DRAFT_SKIPPED_KEY_SUBSTRINGS[self._speculative_method()]
         expected: set[str] = set()
         for name, _ in draft_model.named_parameters():
-            if any(s in name for s in _DSPARK_SKIPPED_KEY_SUBSTRINGS):
+            if any(s in name for s in skipped):
                 continue
             if name == "draft_id_to_target_id":
                 expected.add("draft.d2t")
@@ -524,16 +600,17 @@ class VllmInternalWorkerExtension:
                     )
         return expected
 
-    def _validate_dspark_refit_info(self, state_dict_info: dict[str, Any]) -> None:
+    def _validate_draft_refit_info(self, state_dict_info: dict[str, Any]) -> None:
         """Hard-error when the trainer's ``draft.*`` manifest mismatches the drafter.
 
         Owning ranks require exactly the drafter's loadable key set (plus keys
         the loader intentionally skips); non-owning ranks ignore draft payloads
         entirely and are never required to have a drafter.
         """
-        if self._speculative_method() != "dspark":
+        method = self._speculative_method()
+        if method not in COTRAINED_SPECULATIVE_METHODS:
             return
-        if not self._dspark_owns_speculator():
+        if not self._draft_owns_speculator():
             return
         provided = {k for k in state_dict_info if k.startswith("draft.")}
         if not provided:
@@ -542,12 +619,11 @@ class VllmInternalWorkerExtension:
             # carry only policy weights. Exact-key validation applies only when
             # the trainer co-trains (and therefore streams) the draft.
             return
-        expected = self._dspark_expected_draft_keys()
+        expected = self._expected_draft_keys()
+        skipped = _DRAFT_SKIPPED_KEY_SUBSTRINGS[method]
         missing = expected - provided
         unexpected = {
-            key
-            for key in provided - expected
-            if not any(s in key for s in _DSPARK_SKIPPED_KEY_SUBSTRINGS)
+            key for key in provided - expected if not any(s in key for s in skipped)
         }
         errors = []
         if missing:
@@ -556,8 +632,8 @@ class VllmInternalWorkerExtension:
             errors.append(_format_refit_key_error("unexpected draft keys", unexpected))
         if errors:
             raise RuntimeError(
-                "[draft] DSpark refit manifest does not match the vLLM drafter "
-                "layout: " + "; ".join(errors)
+                f"[draft] {method} refit manifest does not match the vLLM "
+                "drafter layout: " + "; ".join(errors)
             )
 
     def _get_drafter_model(self) -> Any:
@@ -584,18 +660,19 @@ class VllmInternalWorkerExtension:
         if not draft_weights:
             return
 
+        method = self._speculative_method()
         draft_model = self._get_drafter_model()
         if draft_model is None:
-            if self._speculative_method() == "dspark":
-                if self._dspark_owns_speculator():
-                    # DSpark co-training streams every draft weight on each
+            if method in COTRAINED_SPECULATIVE_METHODS:
+                if self._draft_owns_speculator():
+                    # Draft co-training streams every draft weight on each
                     # refit; an owning rank without a speculator would silently
                     # generate with stale draft weights.
                     raise RuntimeError(
-                        "[draft] Received DSpark draft weights but no drafter "
-                        "model was found at model_runner.drafter.model or "
-                        "model_runner.speculator.model. The pinned vLLM's "
-                        "dspark speculator layout may have changed."
+                        f"[draft] Received {method} draft weights but no "
+                        "drafter model was found at model_runner.drafter.model "
+                        "or model_runner.speculator.model. The pinned vLLM's "
+                        f"{method} speculator layout may have changed."
                     )
                 # Non-owning pipeline stages legitimately have no speculator;
                 # draft payloads are not theirs to load.
@@ -604,21 +681,21 @@ class VllmInternalWorkerExtension:
                 "[draft] Received draft weights but vLLM drafter is unavailable; skipping draft update."
             )
             return
-        if self._speculative_method() == "dspark":
-            self._assert_dspark_drafter_owns_modules(draft_model, draft_weights)
+        if method in COTRAINED_SPECULATIVE_METHODS:
+            self._assert_drafter_owns_modules(draft_model, draft_weights)
         draft_weights = self._trim_vocab_padding(draft_model, draft_weights)
         draft_model.load_weights(weights=draft_weights)
 
-    def _assert_dspark_drafter_owns_modules(
+    def _assert_drafter_owns_modules(
         self, draft_model: Any, draft_weights: list[tuple[str, torch.Tensor]]
     ) -> None:
         """Refuse to load draft embed/lm_head through target-shared modules.
 
-        vLLM's ``load_dspark_model`` may alias the drafter's embed_tokens and
+        vLLM's drafter loaders may alias the drafter's embed_tokens and
         lm_head to the target model's modules as a weight-sharing optimization;
         loading refit draft weights through such an alias would overwrite the
         policy's serving weights with the draft's (see
-        ``disable_dspark_draft_module_sharing``). Guard every refit so any path
+        ``disable_draft_module_sharing``). Guard every refit so any path
         that reintroduces the sharing fails loudly instead of silently
         corrupting generation.
         """
@@ -651,13 +728,13 @@ class VllmInternalWorkerExtension:
             shared.append("lm_head")
         if shared:
             raise RuntimeError(
-                "[draft] The DSpark drafter's "
+                "[draft] The drafter's "
                 + "/".join(shared)
                 + " share storage with the target model; loading refit draft "
                 "weights through the alias would overwrite the policy's serving "
-                "weights. Ensure disable_dspark_draft_module_sharing() ran "
+                "weights. Ensure disable_draft_module_sharing() ran "
                 "before engine creation "
-                f"({DSPARK_DISABLE_DRAFT_MODULE_SHARING_ENV}=1)."
+                f"({DRAFT_DISABLE_MODULE_SHARING_ENV}=1)."
             )
 
     def _mtp_drafter_refit_enabled(self) -> bool:

@@ -74,3 +74,58 @@ def test_draft_checkpoint_dir_is_sibling_of_weights_tree():
     assert not (draft_dir + "/").startswith(weights + "/")
     # Trailing slashes must not change the derivation.
     assert draft_checkpoint_dir(weights + "/") == draft_dir
+
+
+def test_legacy_meta_without_algo_resumes_as_dspark():
+    """Pre-versioning dspark checkpoints (no meta_version/algo) must remain
+    loadable by a dspark run."""
+    expected = dict(
+        _TRAINING_META, meta_version=1, algo="dspark", optimizer_layout=None
+    )
+    validate_dspark_checkpoint_meta(_TRAINING_META, expected)
+
+
+def test_algo_mismatch_rejected():
+    saved = dict(_TRAINING_META, meta_version=1, algo="dflash")
+    expected = dict(_TRAINING_META, meta_version=1, algo="dspark")
+    with pytest.raises(ValueError, match="algo mismatch"):
+        validate_dspark_checkpoint_meta(saved, expected)
+
+
+def test_legacy_dspark_meta_rejected_by_eagle3_run():
+    """A legacy (algo-less) checkpoint is dspark; an eagle3 run must refuse it."""
+    expected = {
+        "meta_version": 1,
+        "algo": "eagle3",
+        "aux_layer_ids": [1, 17, 33],
+        "draft_vocab_size": 32000,
+        "optimizer_layout": None,
+    }
+    with pytest.raises(ValueError, match="algo mismatch"):
+        validate_dspark_checkpoint_meta(_TRAINING_META, expected)
+
+
+def test_eagle3_meta_compares_per_algo_keys():
+    saved = {
+        "meta_version": 1,
+        "algo": "eagle3",
+        "aux_layer_ids": [1, 17, 33],
+        "draft_vocab_size": 32000,
+        "optimizer_layout": None,
+    }
+    validate_dspark_checkpoint_meta(saved, dict(saved))
+    with pytest.raises(ValueError, match="aux_layer_ids"):
+        validate_dspark_checkpoint_meta(saved, dict(saved, aux_layer_ids=[2, 18, 34]))
+    with pytest.raises(ValueError, match="draft_vocab_size"):
+        validate_dspark_checkpoint_meta(saved, dict(saved, draft_vocab_size=64000))
+
+
+def test_dspark_draft_vocab_size_compared_only_when_recorded():
+    """Legacy dspark metadata lacks draft_vocab_size; versioned metadata
+    records it and mismatches must reject."""
+    expected = dict(_TRAINING_META, draft_vocab_size=32000, optimizer_layout=None)
+    validate_dspark_checkpoint_meta(_TRAINING_META, expected)
+
+    saved = dict(_TRAINING_META, meta_version=1, algo="dspark", draft_vocab_size=8192)
+    with pytest.raises(ValueError, match="draft_vocab_size"):
+        validate_dspark_checkpoint_meta(saved, expected)

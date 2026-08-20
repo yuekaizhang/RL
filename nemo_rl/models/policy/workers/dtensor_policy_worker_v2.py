@@ -357,22 +357,46 @@ class DTensorPolicyWorkerV2Impl(
         self.draft_model = model_and_optimizer_state.draft_model
         self.composite_model = model_and_optimizer_state.composite_model
 
-        # DSpark co-training runtime (draft loss, hidden capture, grad-norm
-        # reporting). Present only when policy.draft.algo=dspark.
-        self.dspark_runtime = None
+        # Draft co-training runtime (draft loss, hidden capture, grad-norm
+        # reporting). Present when policy.draft is enabled on this backend:
+        # dspark/dflash share DSparkRuntime (dflash is the markov-free,
+        # confidence-free subset), eagle3 uses the TTT Eagle3Runtime.
+        self.draft_runtime = None
+        self.draft_algo = None
         if self.draft_model is not None:
-            from nemo_rl.models.automodel.draft.integration import DSparkRuntime
+            from nemo_rl.models.automodel.draft.integration import (
+                DSparkRuntime,
+                Eagle3Runtime,
+            )
+            from nemo_rl.models.policy import Eagle3DraftOptions
 
             draft_cfg = config.get("draft", {})
-            self.dspark_runtime = DSparkRuntime(
-                draft_model=self.draft_model,
-                dspark_options=draft_cfg["dspark"],
-                loss_weight=float(draft_cfg.get("loss_weight", 1.0)),
+            self.draft_algo = draft_cfg.get("algo", "dspark")
+            # loss_weight has no call-site default: its default lives in the
+            # exemplar YAML (grpo_math_1B.yaml) like every other draft knob.
+            loss_weight = float(draft_cfg["loss_weight"])
+            common_groups = dict(
                 dp_group=self.dp_mesh.get_group(),
                 tp_group=self.tp_mesh.get_group(),
                 cp_group=self.cp_mesh.get_group() if self.cp_size > 1 else None,
             )
-            self.dspark_runtime.attach_capture(self.model)
+            if self.draft_algo == "eagle3":
+                self.draft_runtime = Eagle3Runtime(
+                    draft_model=self.draft_model,
+                    eagle3_options=Eagle3DraftOptions.model_validate(
+                        draft_cfg.get("eagle3", {}) or {}
+                    ),
+                    loss_weight=loss_weight,
+                    **common_groups,
+                )
+            else:
+                self.draft_runtime = DSparkRuntime(
+                    draft_model=self.draft_model,
+                    dspark_options=draft_cfg["dspark"],
+                    loss_weight=loss_weight,
+                    **common_groups,
+                )
+            self.draft_runtime.attach_capture(self.model)
 
             spec_cfg = (
                 config.get("generation", {})
@@ -380,12 +404,27 @@ class DTensorPolicyWorkerV2Impl(
                 .get("speculative_config", {})
             ) or {}
             num_spec_tokens = spec_cfg.get("num_speculative_tokens")
-            block_size = int(self.draft_model.config.block_size)
-            if num_spec_tokens is not None and int(num_spec_tokens) != block_size:
+            if self.draft_algo == "eagle3":
+                expected_spec = int(self.draft_runtime.options.ttt_steps)
+                expected_desc = f"the eagle3 ttt_steps={expected_spec}"
+            else:
+                # dspark blocks predict at every slot; dflash's anchor slot is
+                # an unsupervised bonus token, so it proposes one fewer.
+                block_size = int(self.draft_model.config.block_size)
+                sample_from_anchor = bool(
+                    getattr(self.draft_model.config, "sample_from_anchor", True)
+                )
+                expected_spec = block_size if sample_from_anchor else block_size - 1
+                expected_desc = (
+                    f"the draft's proposal count {expected_spec} "
+                    f"(block_size={block_size}, "
+                    f"sample_from_anchor={sample_from_anchor})"
+                )
+            if num_spec_tokens is not None and int(num_spec_tokens) != expected_spec:
                 warnings.warn(
-                    f"speculative_config.num_speculative_tokens={num_spec_tokens} does "
-                    f"not match the DSpark draft's block_size={block_size}; the drafter "
-                    f"proposes block_size tokens per step."
+                    f"speculative_config.num_speculative_tokens={num_spec_tokens} "
+                    f"does not match {expected_desc}; the drafter proposes "
+                    f"{expected_spec} tokens per step."
                 )
 
         # Initialize reference model if requested
@@ -472,9 +511,9 @@ class DTensorPolicyWorkerV2Impl(
             # Ensure model is in training mode
             self.model.train()
 
-        # DSpark co-training is active only for real training steps; eval and
+        # Draft co-training is active only for real training steps; eval and
         # logprob forwards never run capture hooks or the draft loss.
-        dspark_runtime = self.dspark_runtime if not eval_mode else None
+        draft_runtime = self.draft_runtime if not eval_mode else None
 
         # Create loss post-processor
         loss_post_processor = LossPostProcessor(
@@ -487,15 +526,15 @@ class DTensorPolicyWorkerV2Impl(
             dp_size=self.dp_size,
             enable_seq_packing=self.enable_seq_packing,
             sampling_params=self.sampling_params,
-            dspark_runtime=dspark_runtime,
+            draft_runtime=draft_runtime,
         )
-        if dspark_runtime is not None:
-            from nemo_rl.models.automodel.draft.integration import dspark_capture_ctx
+        if draft_runtime is not None:
+            from nemo_rl.models.automodel.draft.integration import draft_capture_ctx
 
             self.draft_model.train()
             # Replaces the training nullcontext: capture hooks are active for
             # exactly the duration of this train call and removed on any exit.
-            ctx = dspark_capture_ctx(dspark_runtime)
+            ctx = draft_capture_ctx(draft_runtime)
         draft_grad_norm = 0.0
 
         # Create train context factory
@@ -553,13 +592,14 @@ class DTensorPolicyWorkerV2Impl(
                     cp_size=self.cp_size,
                 )
 
-                if dspark_runtime is not None:
+                if draft_runtime is not None:
                     # Slot count = DP-max of valid microbatch counts, i.e. the
                     # padded (dummy-including) count every rank actually runs.
-                    # Used to average the per-slot DSpark losses so the summed
+                    # Used to average the per-slot draft losses so the summed
                     # backward keeps a global-mean gradient scale. Counts can
                     # differ across ranks only under dynamic batching (packing
-                    # is rejected for dspark); otherwise skip the collective.
+                    # is rejected for draft co-training); otherwise skip the
+                    # collective.
                     if self.cfg["dynamic_batching"]["enabled"]:
                         mb_slots_t = torch.tensor(iterator_len, device="cuda")
                         torch.distributed.all_reduce(
@@ -570,7 +610,7 @@ class DTensorPolicyWorkerV2Impl(
                         mb_slots = int(mb_slots_t.item())
                     else:
                         mb_slots = iterator_len
-                    dspark_runtime.begin_global_batch(mb_slots)
+                    draft_runtime.begin_global_batch(mb_slots)
 
                 # Use automodel_forward_backward for the training loop
                 mb_results = automodel_forward_backward(
@@ -635,7 +675,7 @@ class DTensorPolicyWorkerV2Impl(
 
                     # Independent draft clip with the same max norm; the
                     # returned pre-clip norm doubles as the reported metric.
-                    if dspark_runtime is not None:
+                    if draft_runtime is not None:
                         draft_grad_norm = float(
                             scale_grads_and_clip_grad_norm(
                                 self.max_grad_norm,
@@ -675,7 +715,7 @@ class DTensorPolicyWorkerV2Impl(
                 dp_group=self.dp_mesh.get_group(),
                 dtype=self.dtype,
             )
-            if dspark_runtime is not None and not eval_mode:
+            if draft_runtime is not None and not eval_mode:
                 # Like grad_norm, this reflects the last global batch. Returned
                 # as a CPU tensor to match the Megatron worker's return type
                 # (the trainer calls .numpy() on it).
@@ -1468,9 +1508,10 @@ class DTensorPolicyWorkerV2Impl(
         )
         if has_draft:
             from nemo_rl.models.automodel.draft.integration import (
-                dspark_meta_record,
+                draft_meta_record,
                 save_draft_checkpoint,
             )
+            from nemo_rl.models.policy import Eagle3DraftOptions
 
             if optimizer_path and self.optimizer is not None:
                 self.checkpoint_manager.checkpointer.save_optimizer(
@@ -1479,13 +1520,25 @@ class DTensorPolicyWorkerV2Impl(
                     weights_path=optimizer_path,
                     scheduler=self.scheduler,
                 )
+            draft_cfg = self.cfg["draft"]
+            draft_algo = draft_cfg.get("algo", "dspark")
+            if draft_algo == "eagle3":
+                train_embed_and_head = bool(
+                    Eagle3DraftOptions.model_validate(
+                        draft_cfg.get("eagle3", {}) or {}
+                    ).train_embed_and_head
+                )
+            else:
+                train_embed_and_head = bool(draft_cfg["dspark"]["train_embed_and_head"])
             save_draft_checkpoint(
                 self.draft_model,
                 weights_path,
-                meta=dspark_meta_record(
+                meta=draft_meta_record(
                     self.draft_model,
-                    self.cfg["draft"]["model_name"],
+                    draft_cfg["model_name"],
                     self.optimizer,
+                    algo=draft_algo,
+                    train_embed_and_head=train_embed_and_head,
                 ),
             )
 
@@ -1510,6 +1563,7 @@ class DTensorPolicyWorkerV2Impl(
                 weights_path=weights_path,
                 optimizer_path=optimizer_path,
                 model_name=self.cfg["draft"]["model_name"],
+                algo=self.cfg["draft"].get("algo", "dspark"),
             )
         else:
             self.checkpoint_manager.load_checkpoint(
