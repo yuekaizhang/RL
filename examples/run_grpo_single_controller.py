@@ -35,7 +35,10 @@ from nemo_rl.algorithms.single_controller_utils import (
 from nemo_rl.algorithms.utils import get_tokenizer
 from nemo_rl.distributed.virtual_cluster import init_ray
 from nemo_rl.environments.nemo_gym import setup_nemo_gym_config
-from nemo_rl.models.generation import configure_generation_config
+from nemo_rl.models.generation import (
+    configure_generation_config,
+    draft_full_refit_enabled,
+)
 from nemo_rl.utils.config import (
     load_config,
     parse_hydra_overrides,
@@ -48,17 +51,6 @@ from nemo_rl.utils.logger import get_next_experiment_dir
 current_dir = os.path.dirname(os.path.abspath(__file__))
 while current_dir in sys.path:
     sys.path.remove(current_dir)
-
-
-def _draft_full_refit_enabled(policy_cfg) -> bool:
-    """DTensor-v2 draft co-training streams the drafter's full weight set."""
-    draft_cfg = policy_cfg.get("draft") or {}
-    dtensor_cfg = policy_cfg.get("dtensor_cfg") or {}
-    return (
-        bool(draft_cfg.get("enabled", False))
-        and bool(dtensor_cfg.get("enabled", False))
-        and bool(dtensor_cfg.get("_v2", False))
-    )
 
 
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
@@ -133,7 +125,7 @@ def main() -> None:
         tokenizer,
         has_refit_draft_weights=has_refit_draft_weights,
         trains_mtp=trains_mtp,
-        draft_full_refit=_draft_full_refit_enabled(config.policy),
+        draft_full_refit=draft_full_refit_enabled(config.policy),
     )
 
     # NeMo-Gym specific config setup.

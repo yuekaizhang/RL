@@ -70,8 +70,6 @@ COTRAINED_SPECULATIVE_METHODS = ("dspark", "dflash", "eagle3")
 # vLLM executor workers, which import it for worker_extension_cls before
 # loading the model).
 DRAFT_DISABLE_MODULE_SHARING_ENV = "NRL_DRAFT_DISABLE_MODULE_SHARING"
-# Backwards-compatible alias from when only dspark was supported.
-DSPARK_DISABLE_DRAFT_MODULE_SHARING_ENV = DRAFT_DISABLE_MODULE_SHARING_ENV
 
 
 def disable_draft_module_sharing() -> None:
@@ -105,10 +103,6 @@ def disable_draft_module_sharing() -> None:
     eagle_utils._should_share = _never_share
     dspark_utils._should_share = _never_share
     dflash_utils._should_share = _never_share
-
-
-# Backwards-compatible alias from when only dspark was supported.
-disable_dspark_draft_module_sharing = disable_draft_module_sharing
 
 
 if os.environ.get(DRAFT_DISABLE_MODULE_SHARING_ENV) == "1":

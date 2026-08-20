@@ -491,6 +491,10 @@ class DSparkDraftOptions(TypedDict):
 # algo (the original megatron co-training path predates the algo field).
 # Every reader of policy.draft["algo"] must use this same default.
 DEFAULT_DRAFT_ALGO = "eagle3"
+# Block drafters propose a whole anchored block per step and exist only on
+# the DTensor-v2 co-training path; eagle3 additionally runs on Megatron.
+BLOCK_DRAFT_ALGOS = ("dspark", "dflash")
+DRAFT_ALGOS = ("eagle3", *BLOCK_DRAFT_ALGOS)
 
 
 class Eagle3DraftOptions(BaseModel, extra="allow"):

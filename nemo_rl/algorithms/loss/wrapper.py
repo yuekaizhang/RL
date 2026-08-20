@@ -334,10 +334,6 @@ class DraftRuntimeLossWrapper:
         return combined_loss, metrics
 
 
-# Backwards-compatible alias from when the automodel path only supported dspark.
-DSparkLossWrapper = DraftRuntimeLossWrapper
-
-
 def wrap_loss_fn_with_input_preparation(
     next_token_logits: Tensor,
     data: BatchedDataDict[Any],

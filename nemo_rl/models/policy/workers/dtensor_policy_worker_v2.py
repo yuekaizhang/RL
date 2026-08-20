@@ -1511,7 +1511,6 @@ class DTensorPolicyWorkerV2Impl(
                 draft_meta_record,
                 save_draft_checkpoint,
             )
-            from nemo_rl.models.policy import Eagle3DraftOptions
 
             if optimizer_path and self.optimizer is not None:
                 self.checkpoint_manager.checkpointer.save_optimizer(
@@ -1520,25 +1519,25 @@ class DTensorPolicyWorkerV2Impl(
                     weights_path=optimizer_path,
                     scheduler=self.scheduler,
                 )
-            draft_cfg = self.cfg["draft"]
-            draft_algo = draft_cfg.get("algo", DEFAULT_DRAFT_ALGO)
+            # The runtime holds the validated per-algo options resolved at
+            # worker init; re-parsing the raw config here could drift.
             ttt_steps = None
-            if draft_algo == "eagle3":
-                eagle3_options = Eagle3DraftOptions.model_validate(
-                    draft_cfg.get("eagle3", {}) or {}
-                )
-                train_embed_and_head = bool(eagle3_options.train_embed_and_head)
-                ttt_steps = int(eagle3_options.ttt_steps)
+            if self.draft_algo == "eagle3":
+                options = self.draft_runtime.options
+                train_embed_and_head = bool(options.train_embed_and_head)
+                ttt_steps = int(options.ttt_steps)
             else:
-                train_embed_and_head = bool(draft_cfg["dspark"]["train_embed_and_head"])
+                train_embed_and_head = bool(
+                    self.draft_runtime.options["train_embed_and_head"]
+                )
             save_draft_checkpoint(
                 self.draft_model,
                 weights_path,
                 meta=draft_meta_record(
                     self.draft_model,
-                    draft_cfg["model_name"],
+                    self.cfg["draft"]["model_name"],
                     self.optimizer,
-                    algo=draft_algo,
+                    algo=self.draft_algo,
                     train_embed_and_head=train_embed_and_head,
                     ttt_steps=ttt_steps,
                 ),
@@ -1554,17 +1553,12 @@ class DTensorPolicyWorkerV2Impl(
             from nemo_rl.models.automodel.draft.integration import (
                 load_dspark_checkpoint,
             )
-            from nemo_rl.models.policy import Eagle3DraftOptions
 
-            draft_cfg = self.cfg["draft"]
-            draft_algo = draft_cfg.get("algo", DEFAULT_DRAFT_ALGO)
-            ttt_steps = None
-            if draft_algo == "eagle3":
-                ttt_steps = int(
-                    Eagle3DraftOptions.model_validate(
-                        draft_cfg.get("eagle3", {}) or {}
-                    ).ttt_steps
-                )
+            ttt_steps = (
+                int(self.draft_runtime.options.ttt_steps)
+                if self.draft_algo == "eagle3"
+                else None
+            )
             load_dspark_checkpoint(
                 self.checkpoint_manager,
                 model=self.model,
@@ -1574,8 +1568,8 @@ class DTensorPolicyWorkerV2Impl(
                 scheduler=self.scheduler,
                 weights_path=weights_path,
                 optimizer_path=optimizer_path,
-                model_name=draft_cfg["model_name"],
-                algo=draft_algo,
+                model_name=self.cfg["draft"]["model_name"],
+                algo=self.draft_algo,
                 ttt_steps=ttt_steps,
             )
         else:

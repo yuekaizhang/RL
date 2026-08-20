@@ -38,7 +38,12 @@ from nemo_rl.models.generation.interfaces import (
     GenerationInterface,
     GenerationOutputSpec,
 )
-from nemo_rl.models.policy import DEFAULT_DRAFT_ALGO, PolicyConfig
+from nemo_rl.models.policy import (
+    BLOCK_DRAFT_ALGOS,
+    DEFAULT_DRAFT_ALGO,
+    DRAFT_ALGOS,
+    PolicyConfig,
+)
 from nemo_rl.models.policy.interfaces import (
     ColocatablePolicyInterface,
     LogprobOutputSpec,
@@ -125,9 +130,9 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
                 "DTensor (policy.dtensor_cfg.enabled=true), not both."
             )
         draft_algo = draft_cfg.get("algo", DEFAULT_DRAFT_ALGO)
-        if draft_enabled and draft_algo not in ("eagle3", "dspark", "dflash"):
+        if draft_enabled and draft_algo not in DRAFT_ALGOS:
             raise ValueError(
-                f"policy.draft.algo must be one of {{'eagle3', 'dspark', 'dflash'}} "
+                f"policy.draft.algo must be one of {set(DRAFT_ALGOS)} "
                 f"when policy.draft.enabled=true, got {draft_algo!r}."
             )
         dtensor_cfg = config.get("dtensor_cfg", {})
@@ -143,14 +148,14 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
                     "backend (policy.dtensor_cfg.enabled=true and "
                     "policy.dtensor_cfg._v2=true)."
                 )
-        if draft_enabled and draft_algo in ("dspark", "dflash"):
+        if draft_enabled and draft_algo in BLOCK_DRAFT_ALGOS:
             if megatron_enable or not dtensor_v2_enable:
                 raise ValueError(
                     f"policy.draft.algo={draft_algo} requires the DTensor v2 backend "
                     "(policy.dtensor_cfg.enabled=true and policy.dtensor_cfg._v2=true)."
                 )
         if draft_enabled and (
-            draft_algo in ("dspark", "dflash")
+            draft_algo in BLOCK_DRAFT_ALGOS
             or (draft_algo == "eagle3" and dtensor_v2_enable)
         ):
             if draft_cfg.get("model_name") is None:

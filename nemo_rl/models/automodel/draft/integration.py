@@ -94,11 +94,6 @@ def load_draft_hf_config(
     return flat_config
 
 
-def load_dspark_draft_hf_config(model_name: str) -> Any:
-    """Backward-compatible alias for the dspark algo."""
-    return load_draft_hf_config(model_name, algo="dspark")
-
-
 def _adapt_speculators_dspark_config(
     config_dict: dict[str, Any], algo: str = "dspark"
 ) -> Any:
@@ -539,20 +534,29 @@ class DSparkHiddenCapture:
         return torch.cat([self._captured[i] for i in self.target_layer_ids], dim=-1)
 
 
-class DSparkRuntime:
-    """Per-worker DSpark co-training state: draft model, capture, and loss."""
+class _DraftRuntimeBase:
+    """Shared per-worker draft co-training state and distributed plumbing.
+
+    Subclasses supply the loss (``compute_loss``) and the layer-id source for
+    the hidden capture (``_capture_layer_ids``); everything here is common to
+    every drafter family: the option/group state, the microbatch-slot
+    normalization, and the teacher-logits stash.
+    """
+
+    # Algo family name used in error messages.
+    _algo_label = "Draft"
 
     def __init__(
         self,
-        draft_model: Qwen3DSparkModel,
-        dspark_options: dict[str, Any],
+        draft_model: nn.Module,
+        options: Any,
         loss_weight: float,
         dp_group: Optional[dist.ProcessGroup],
         tp_group: Optional[dist.ProcessGroup] = None,
         cp_group: Optional[dist.ProcessGroup] = None,
     ):
         self.draft_model = draft_model
-        self.options = dspark_options
+        self.options = options
         self.loss_weight = float(loss_weight)
         self.dp_group = dp_group
         self.tp_group = tp_group
@@ -574,20 +578,21 @@ class DSparkRuntime:
         """Record this global batch's microbatch-slot count (identical on all ranks).
 
         The training loop sums per-microbatch losses across gradient
-        accumulation, while each DSpark microbatch loss is a mean over that
-        microbatch's (DP-all-reduced) anchor tokens. Dividing every microbatch
-        term by the slot count turns the sum into an average of per-slot global
-        means, keeping the draft gradient scale independent of gbs/mbs — the
-        same effective scale as the policy loss, which normalizes each
-        microbatch by the whole-global-batch token denominator instead.
+        accumulation, while each draft microbatch loss is a mean over that
+        microbatch's (DP-all-reduced) supervised tokens. Dividing every
+        microbatch term by the slot count turns the sum into an average of
+        per-slot global means, keeping the draft gradient scale independent of
+        gbs/mbs — the same effective scale as the policy loss, which normalizes
+        each microbatch by the whole-global-batch token denominator instead.
         """
         self._num_microbatch_slots = max(int(num_microbatch_slots), 1)
 
+    def _capture_layer_ids(self) -> list[int]:
+        raise NotImplementedError
+
     def attach_capture(self, policy_model: nn.Module) -> None:
         if self.capture is None:
-            self.capture = DSparkHiddenCapture(
-                policy_model, list(self.draft_model.config.target_layer_ids)
-            )
+            self.capture = DSparkHiddenCapture(policy_model, self._capture_layer_ids())
 
     def stash_teacher_logits(
         self, logits: torch.Tensor, will_scale_inplace: bool
@@ -604,27 +609,59 @@ class DSparkRuntime:
         if not isinstance(logits, DTensor) and self.tp_group is not None:
             if dist.get_world_size(self.tp_group) > 1:
                 raise RuntimeError(
-                    "DSpark co-training with tensor_parallel_size > 1 expects the "
-                    "policy logits as a vocab-sharded DTensor, but got a plain "
-                    f"{type(logits).__name__}; a bare local shard cannot be "
-                    "gathered safely."
+                    f"{self._algo_label} co-training with tensor_parallel_size "
+                    "> 1 expects the policy logits as a vocab-sharded DTensor, "
+                    f"but got a plain {type(logits).__name__}; a bare local "
+                    "shard cannot be gathered safely."
                 )
         raw = logits.detach()
         self._teacher_logits = raw.clone() if will_scale_inplace else raw
 
-    def compute_loss(self, data_dict: Any) -> tuple[torch.Tensor, dict[str, float]]:
-        """Run the draft forward on the captured hiddens and compute the DSpark loss."""
+    def _require_capture_and_teacher(self) -> torch.Tensor:
+        """Common compute_loss preamble: guards plus the stashed teacher."""
         if self.capture is None or not self.capture.active:
             raise RuntimeError(
-                "DSpark loss requested but hidden capture is not active; the worker "
-                "must activate capture around the training forward."
+                f"{self._algo_label} loss requested but hidden capture is not "
+                "active; the worker must activate capture around the training "
+                "forward."
             )
-        teacher_logits = self._teacher_logits
-        if teacher_logits is None:
+        if self._teacher_logits is None:
             raise RuntimeError(
-                "DSpark loss requested but no teacher logits were stashed for this "
-                "microbatch."
+                f"{self._algo_label} loss requested but no teacher logits were "
+                "stashed for this microbatch."
             )
+        return self._teacher_logits
+
+
+class DSparkRuntime(_DraftRuntimeBase):
+    """Per-worker DSpark co-training state: draft model, capture, and loss."""
+
+    _algo_label = "DSpark"
+
+    def __init__(
+        self,
+        draft_model: Qwen3DSparkModel,
+        dspark_options: dict[str, Any],
+        loss_weight: float,
+        dp_group: Optional[dist.ProcessGroup],
+        tp_group: Optional[dist.ProcessGroup] = None,
+        cp_group: Optional[dist.ProcessGroup] = None,
+    ):
+        super().__init__(
+            draft_model=draft_model,
+            options=dspark_options,
+            loss_weight=loss_weight,
+            dp_group=dp_group,
+            tp_group=tp_group,
+            cp_group=cp_group,
+        )
+
+    def _capture_layer_ids(self) -> list[int]:
+        return list(self.draft_model.config.target_layer_ids)
+
+    def compute_loss(self, data_dict: Any) -> tuple[torch.Tensor, dict[str, float]]:
+        """Run the draft forward on the captured hiddens and compute the DSpark loss."""
+        teacher_logits = self._require_capture_and_teacher()
         if isinstance(teacher_logits, DTensor):
             # Vocab-sharded under TP; the draft's teacher gather needs the full
             # vocab dimension.
@@ -730,7 +767,7 @@ class DSparkRuntime:
 
 
 @contextlib.contextmanager
-def dspark_capture_ctx(runtime: Any):
+def draft_capture_ctx(runtime: Any):
     """Keep the hidden-capture hooks active for the duration of a train call.
 
     Works for any draft runtime exposing ``capture`` (dspark/dflash/eagle3).
@@ -741,11 +778,6 @@ def dspark_capture_ctx(runtime: Any):
         yield
     finally:
         runtime.capture.deactivate()
-
-
-# Alias reflecting the runtime-agnostic contract; dspark_capture_ctx is kept
-# for backward compatibility.
-draft_capture_ctx = dspark_capture_ctx
 
 
 def next_token_position_mask(token_mask: torch.Tensor) -> torch.Tensor:
@@ -764,14 +796,14 @@ def next_token_position_mask(token_mask: torch.Tensor) -> torch.Tensor:
     return shifted
 
 
-class Eagle3Runtime:
+class Eagle3Runtime(_DraftRuntimeBase):
     """Per-worker EAGLE3 co-training state: draft model, capture, TTT loss.
 
-    Exposes the same runtime protocol as DSparkRuntime
-    (attach_capture / begin_global_batch / stash_teacher_logits /
-    compute_loss) so the worker and loss wrapper treat all draft algos
-    uniformly.
+    Exposes the same runtime protocol as DSparkRuntime so the worker and
+    loss wrapper treat all draft algos uniformly.
     """
+
+    _algo_label = "EAGLE3"
 
     def __init__(
         self,
@@ -782,57 +814,21 @@ class Eagle3Runtime:
         tp_group: Optional[dist.ProcessGroup] = None,
         cp_group: Optional[dist.ProcessGroup] = None,
     ):
-        self.draft_model = draft_model
-        self.options = eagle3_options
-        self.loss_weight = float(loss_weight)
-        self.dp_group = dp_group
-        self.tp_group = tp_group
-        self.cp_group = cp_group
-        self.capture: Optional[DSparkHiddenCapture] = None
-        self._teacher_logits: Optional[torch.Tensor] = None
-        self._num_microbatch_slots: int = 1
+        super().__init__(
+            draft_model=draft_model,
+            options=eagle3_options,
+            loss_weight=loss_weight,
+            dp_group=dp_group,
+            tp_group=tp_group,
+            cp_group=cp_group,
+        )
 
-    @property
-    def _cp_size(self) -> int:
-        return dist.get_world_size(self.cp_group) if self.cp_group is not None else 1
-
-    def begin_global_batch(self, num_microbatch_slots: int) -> None:
-        """See DSparkRuntime.begin_global_batch (same slot normalization)."""
-        self._num_microbatch_slots = max(int(num_microbatch_slots), 1)
-
-    def attach_capture(self, policy_model: nn.Module) -> None:
-        if self.capture is None:
-            self.capture = DSparkHiddenCapture(
-                policy_model, list(self.draft_model.target_layer_ids)
-            )
-
-    def stash_teacher_logits(
-        self, logits: torch.Tensor, will_scale_inplace: bool
-    ) -> None:
-        """Record the policy's raw logits (see DSparkRuntime for semantics)."""
-        if not isinstance(logits, DTensor) and self.tp_group is not None:
-            if dist.get_world_size(self.tp_group) > 1:
-                raise RuntimeError(
-                    "EAGLE3 co-training with tensor_parallel_size > 1 expects the "
-                    "policy logits as a vocab-sharded DTensor, but got a plain "
-                    f"{type(logits).__name__}."
-                )
-        raw = logits.detach()
-        self._teacher_logits = raw.clone() if will_scale_inplace else raw
+    def _capture_layer_ids(self) -> list[int]:
+        return list(self.draft_model.target_layer_ids)
 
     def compute_loss(self, data_dict: Any) -> tuple[torch.Tensor, dict[str, float]]:
         """Run the TTT draft forward on captured hiddens and compute the loss."""
-        if self.capture is None or not self.capture.active:
-            raise RuntimeError(
-                "EAGLE3 loss requested but hidden capture is not active; the "
-                "worker must activate capture around the training forward."
-            )
-        teacher_logits = self._teacher_logits
-        if teacher_logits is None:
-            raise RuntimeError(
-                "EAGLE3 loss requested but no teacher logits were stashed for "
-                "this microbatch."
-            )
+        teacher_logits = self._require_capture_and_teacher()
         if isinstance(teacher_logits, DTensor):
             teacher_logits = teacher_logits.full_tensor()
         # Map the teacher into draft-vocab order before any CP gather so the
@@ -902,25 +898,40 @@ class Eagle3Runtime:
         )
 
         decay = float(self.options.ttt_step_loss_decay)
+        # One all-reduce over the stacked per-step denominators instead of one
+        # tiny collective per TTT step (elementwise sum-reduce is identical).
+        dens_global = torch.stack([den.detach() for den in terms.loss_dens])
+        if self.dp_group is not None and dist.is_initialized():
+            dist.all_reduce(dens_global, group=self.dp_group)
         loss = fused_hidden.new_zeros((), dtype=torch.float32)
+        for step, num in enumerate(terms.loss_nums):
+            loss = loss + (decay**step) * num / dens_global[step]
+
+        # Metrics: one host transfer for all per-step scalars instead of ~5
+        # device syncs per step (see DSparkRuntime._terms_to_metrics).
+        stats = (
+            torch.stack(
+                [
+                    torch.stack(terms.loss_nums).detach(),
+                    torch.stack(terms.loss_dens).detach(),
+                    torch.stack(terms.full_acc_nums),
+                    torch.stack(terms.full_acc_dens),
+                    torch.stack(terms.cond_acc_nums),
+                    torch.stack(terms.cond_acc_dens),
+                ]
+            )
+            .float()
+            .tolist()
+        )
+        loss_nums, loss_dens, full_nums, full_dens, cond_nums, cond_dens = stats
         metrics: dict[str, float] = {}
-        for step, (num, den) in enumerate(zip(terms.loss_nums, terms.loss_dens)):
-            den_global = den.detach().clone()
-            if self.dp_group is not None and dist.is_initialized():
-                dist.all_reduce(den_global, group=self.dp_group)
-            loss = loss + (decay**step) * num / den_global
-            metrics[f"draft_ttt_loss@{step}"] = float((num / den).item())
-            full_den = float(terms.full_acc_dens[step].item())
-            cond_den = float(terms.cond_acc_dens[step].item())
+        for step in range(len(loss_nums)):
+            metrics[f"draft_ttt_loss@{step}"] = loss_nums[step] / loss_dens[step]
             metrics[f"draft_full_acc@{step}"] = (
-                float(terms.full_acc_nums[step].item()) / full_den
-                if full_den > 0
-                else 0.0
+                full_nums[step] / full_dens[step] if full_dens[step] > 0 else 0.0
             )
             metrics[f"draft_cond_acc@{step}"] = (
-                float(terms.cond_acc_nums[step].item()) / cond_den
-                if cond_den > 0
-                else 0.0
+                cond_nums[step] / cond_dens[step] if cond_dens[step] > 0 else 0.0
             )
         metrics["draft_loss"] = float(loss.item())
         # See DSparkRuntime.begin_global_batch: average across microbatch
@@ -1009,15 +1020,6 @@ def draft_meta_record(
     else:
         raise ValueError(f"Unknown draft algo {algo!r} for checkpoint metadata.")
     return record
-
-
-def dspark_meta_record(
-    draft_model: Qwen3DSparkModel,
-    model_name: str,
-    optimizer: Optional[torch.optim.Optimizer],
-) -> dict[str, Any]:
-    """Backward-compatible alias building dspark metadata."""
-    return draft_meta_record(draft_model, model_name, optimizer, algo="dspark")
 
 
 def draft_checkpoint_dir(weights_path: str) -> str:

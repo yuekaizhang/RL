@@ -73,6 +73,7 @@ from nemo_rl.models.automodel.config import (
 )
 from nemo_rl.models.policy import (
     DEFAULT_DRAFT_ALGO,
+    DRAFT_ALGOS,
     PolicyConfig,
     TokenizerConfig,
 )
@@ -825,11 +826,7 @@ def setup_model_and_optimizer(
     # join the optimizer (and any optimizer-state resume) from the start.
     draft_cfg = config.get("draft", {}) or {}
     draft_algo = draft_cfg.get("algo", DEFAULT_DRAFT_ALGO)
-    draft_enabled = bool(draft_cfg.get("enabled", False)) and draft_algo in (
-        "dspark",
-        "dflash",
-        "eagle3",
-    )
+    draft_enabled = bool(draft_cfg.get("enabled", False)) and draft_algo in DRAFT_ALGOS
     draft_model = None
     composite_model = None
     if draft_enabled:

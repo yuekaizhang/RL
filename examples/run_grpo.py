@@ -23,7 +23,10 @@ from nemo_rl.algorithms.grpo import MasterConfig, grpo_train, setup
 from nemo_rl.algorithms.utils import get_tokenizer
 from nemo_rl.data.utils import setup_response_data
 from nemo_rl.distributed.virtual_cluster import init_ray
-from nemo_rl.models.generation import configure_generation_config
+from nemo_rl.models.generation import (
+    configure_generation_config,
+    draft_full_refit_enabled,
+)
 from nemo_rl.utils.config import (
     load_config,
     parse_hydra_overrides,
@@ -31,17 +34,6 @@ from nemo_rl.utils.config import (
 )
 from nemo_rl.utils.logger import get_next_experiment_dir, log_container_init_timing
 from nemo_rl.utils.timer import Timer
-
-
-def _draft_full_refit_enabled(policy_cfg) -> bool:
-    """DTensor-v2 draft co-training streams the drafter's full weight set."""
-    draft_cfg = policy_cfg.get("draft") or {}
-    dtensor_cfg = policy_cfg.get("dtensor_cfg") or {}
-    return (
-        bool(draft_cfg.get("enabled", False))
-        and bool(dtensor_cfg.get("enabled", False))
-        and bool(dtensor_cfg.get("_v2", False))
-    )
 
 
 def _select_trainer(master_config: MasterConfig):
@@ -130,7 +122,7 @@ def main() -> None:
             tokenizer,
             has_refit_draft_weights=has_refit_draft_weights,
             trains_mtp=trains_mtp,
-            draft_full_refit=_draft_full_refit_enabled(config.policy),
+            draft_full_refit=draft_full_refit_enabled(config.policy),
         )
 
     # setup data

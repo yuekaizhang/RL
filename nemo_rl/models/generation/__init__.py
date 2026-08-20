@@ -24,6 +24,23 @@ from nemo_rl.models.generation.vllm.config import VLLM_SPARSE_REFIT_TRANSPORTS
 TokenizerType = PreTrainedTokenizerBase
 
 
+def draft_full_refit_enabled(policy_cfg: dict) -> bool:
+    """Whether the trainer streams the drafter's FULL weight set on refit.
+
+    True for DTensor-v2 draft co-training (dspark/dflash/eagle3), which
+    exports the drafter's entire state_dict under the ``draft.`` prefix; the
+    megatron eagle3 path streams a partial set instead. Feeds the
+    ``draft_full_refit`` argument of :func:`configure_generation_config`.
+    """
+    draft_cfg = policy_cfg.get("draft") or {}
+    dtensor_cfg = policy_cfg.get("dtensor_cfg") or {}
+    return (
+        bool(draft_cfg.get("enabled", False))
+        and bool(dtensor_cfg.get("enabled", False))
+        and bool(dtensor_cfg.get("_v2", False))
+    )
+
+
 def configure_generation_config(
     config: GenerationConfig,
     tokenizer: TokenizerType,
