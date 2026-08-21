@@ -24,12 +24,30 @@ from nemo_rl.models.generation.vllm.config import VLLM_SPARSE_REFIT_TRANSPORTS
 TokenizerType = PreTrainedTokenizerBase
 
 
+def draft_full_refit_enabled(policy_cfg: dict) -> bool:
+    """Whether the trainer streams the drafter's FULL weight set on refit.
+
+    True for DTensor-v2 draft co-training (dspark/dflash/eagle3), which
+    exports the drafter's entire state_dict under the ``draft.`` prefix; the
+    megatron eagle3 path streams a partial set instead. Feeds the
+    ``draft_full_refit`` argument of :func:`configure_generation_config`.
+    """
+    draft_cfg = policy_cfg.get("draft") or {}
+    dtensor_cfg = policy_cfg.get("dtensor_cfg") or {}
+    return (
+        bool(draft_cfg.get("enabled", False))
+        and bool(dtensor_cfg.get("enabled", False))
+        and bool(dtensor_cfg.get("_v2", False))
+    )
+
+
 def configure_generation_config(
     config: GenerationConfig,
     tokenizer: TokenizerType,
     is_eval: bool = False,
     has_refit_draft_weights: bool = False,
     trains_mtp: bool = False,
+    draft_full_refit: bool = False,
 ) -> GenerationConfig:
     """Apply specific configurations to generation config."""
     # tokenizer setting
@@ -88,6 +106,12 @@ def configure_generation_config(
         # If the trainer does not train the MTP layer, the weights need to be
         # loaded from the checkpoint.
         config["_mtp_weights_from_refit"] = trains_mtp
+
+        # Whether the trainer streams the drafter's FULL weight set (incl.
+        # embed_tokens/lm_head) on every refit — true for DTensor-v2 draft
+        # co-training. The megatron eagle3 path streams a partial set and
+        # relies on drafter module sharing instead.
+        config["_draft_full_refit"] = draft_full_refit
 
         # Respect the skip_tokenizer_init setting from the config. VLMs for example, require this to be False.
         if "skip_tokenizer_init" not in config["vllm_cfg"]:

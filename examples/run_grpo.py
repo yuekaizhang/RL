@@ -28,7 +28,10 @@ from nemo_rl.algorithms.grpo import (
 from nemo_rl.algorithms.utils import get_tokenizer
 from nemo_rl.data.utils import setup_response_data
 from nemo_rl.distributed.virtual_cluster import init_ray
-from nemo_rl.models.generation import configure_generation_config
+from nemo_rl.models.generation import (
+    configure_generation_config,
+    draft_full_refit_enabled,
+)
 from nemo_rl.utils.config import (
     load_config,
     parse_hydra_overrides,
@@ -124,6 +127,7 @@ def main() -> None:
             tokenizer,
             has_refit_draft_weights=has_refit_draft_weights,
             trains_mtp=trains_mtp,
+            draft_full_refit=draft_full_refit_enabled(config.policy),
         )
 
     # setup data
