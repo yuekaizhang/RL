@@ -289,6 +289,63 @@ class DraftLossWrapper:
         return combined_loss, metrics
 
 
+class DraftRuntimeLossWrapper:
+    """Combine policy loss with a co-trained drafter loss (automodel path).
+
+    Structural sibling of DraftLossWrapper: the policy loss is computed exactly
+    as without a draft, then the draft runtime (dspark/dflash block drafter or
+    eagle3 TTT drafter) runs the draft forward on the hidden states and raw
+    teacher logits captured during the policy forward (both detached, so the
+    policy trunk's gradients are unchanged).
+    """
+
+    def __init__(
+        self,
+        loss_fn: Callable[..., tuple[torch.Tensor, dict[str, Any]]],
+        prepare_fn: Callable[..., Any],
+        draft_runtime: Any,
+        draft_loss_scale: float = 1.0,
+    ):
+        self.loss_fn = loss_fn
+        self.prepare_fn = prepare_fn
+        self.draft_runtime = draft_runtime
+        # Restores the draft's gradient scale under context parallelism: the
+        # trainer backprops (dp*cp/cp_gradient_fanout) * combined_loss, where
+        # the fanout division compensates the policy loss's CP gather fan-out.
+        # The draft loss is replicated across CP ranks (teacher/hiddens are
+        # allgathered) and its FSDP grads average over dp*cp, so it needs the
+        # full dp*cp multiplier; the caller passes cp_gradient_fanout here to
+        # cancel the division for the draft term only (1.0 when cp == 1).
+        self.draft_loss_scale = float(draft_loss_scale)
+
+    def __call__(
+        self,
+        next_token_logits: torch.Tensor,
+        data: BatchedDataDict[Any],
+        global_valid_seqs: torch.Tensor | None,
+        global_valid_toks: torch.Tensor | None,
+    ) -> tuple[torch.Tensor, dict[str, Any]]:
+        loss_input, prepared_data = self.prepare_fn(
+            next_token_logits,
+            data,
+            self.loss_fn,
+        )
+        policy_loss, metrics = self.loss_fn(
+            data=prepared_data,
+            global_valid_seqs=global_valid_seqs,
+            global_valid_toks=global_valid_toks,
+            **loss_input,
+        )
+
+        draft_loss, draft_metrics = self.draft_runtime.compute_loss(prepared_data)
+        combined_loss = (
+            policy_loss
+            + self.draft_runtime.loss_weight * self.draft_loss_scale * draft_loss
+        )
+        metrics.update(draft_metrics)
+        return combined_loss, metrics
+
+
 def wrap_loss_fn_with_input_preparation(
     next_token_logits: Tensor,
     data: BatchedDataDict[Any],
