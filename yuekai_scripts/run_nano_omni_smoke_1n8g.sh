@@ -6,6 +6,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RESULTS_DIR="${RESULTS_DIR:-${REPO}/results/nano-omni-tau1-smoke-1n8g}"
+CONFIG_PATH="${CONFIG_PATH:-examples/nemo_gym/grpo_nano_omni_30ba3b_tau1_smoke_1n8g.yaml}"
 
 # Working tree must win over the editable /opt/nemo-rl install baked into the
 # container: nemo_rl itself, the pinned Gym checkout (config_paths resolution),
@@ -22,7 +23,7 @@ mkdir -p "${RESULTS_DIR}"
 cd "${REPO}"
 
 uv run --no-sync examples/nemo_gym/run_grpo_nemo_gym.py \
-    --config examples/nemo_gym/grpo_nano_omni_30ba3b_tau1_smoke_1n8g.yaml \
+    --config "${CONFIG_PATH}" \
     data.train.data_path="${REPO}/datasets/conversational_tool_use_pivot/train.jsonl" \
     data.validation.data_path="${REPO}/datasets/conversational_tool_use_pivot/val.jsonl" \
     logger.log_dir="${RESULTS_DIR}/logs" \
