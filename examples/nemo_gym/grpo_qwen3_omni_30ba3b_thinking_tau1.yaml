@@ -1,0 +1,168 @@
+# TAU1 conversational tool-use pivot recipe for Qwen3-Omni-30B-A3B-Thinking.
+#
+# Same recipe as grpo_qwen3_30ba3b_thinking_tau1.yaml (colocated sync GRPO,
+# 64x16, clip 0.2/0.2, 32k, TP1/PP4/CP4/EP8) with the omni thinker as policy.
+# The omni thinker LLM shares the 48-layer / 128-expert MoE shape with
+# Qwen3-30B-A3B, so the parallel layout carries over; audio/vision encoders and
+# talker ride along per Megatron-Bridge's qwen3_omni bridge.
+
+defaults: "grpo_qwen3_30ba3b_thinking_tau1.yaml"
+
+checkpointing:
+  checkpoint_dir: results/grpo-qwen3-omni-30b-thinking-tau1
+policy:
+  model_name: Qwen/Qwen3-Omni-30B-A3B-Thinking
+  # mcore has no packed-sequence support for Qwen3-Omni (NotImplementedError at
+  # get_logprobs/train), so packing is off; dynamic batching is also off because
+  # it requires PP=1. Plain mbs=1 batching is slower but compatible with PP4.
+  # CP requires sequence packing, so CP collapses to 1: a replica is TP1*PP4 =
+  # 4 ranks, giving DP=8 on 32 GPUs (EP=8 still divides DP*CP).
+  sequence_packing:
+    enabled: false
+  dynamic_batching:
+    enabled: false
+  megatron_cfg:
+    context_parallel_size: 1
+    # Qwen3-Omni uses the Qwen3-VL attention path (per-token absolute positional
+    # frequencies), incompatible with TE fused RoPE; mcore asserts this is false.
+    apply_rope_fusion: false
+    # Return training memory aggressively so the colocated vLLM wake_up can
+    # reclaim its allocation between steps.
+    empty_unused_memory_level: 2
+  generation:
+    vllm_cfg:
+      # The omni audio encoder has 20 attention heads, which TP=8 cannot split
+      # (vLLM QKVParallelLinear asserts). TP=4 divides all encoder/thinker head
+      # counts; colocated nodes then run 2 DP vLLM instances of TP4 each.
+      tensor_parallel_size: 4
+      expert_parallel_size: 4
+      # At TP4 each GPU holds 2x the vLLM weight share vs the 2507 recipe's TP8,
+      # and the omni encoders add training-side residency; wake_up at 0.7 OOMs
+      # (same colocated cumem remap failure as the 2507 1n8g smoke).
+      gpu_memory_utilization: 0.5
+      http_server_serving_chat_kwargs:
+        # The omni template's multimodal branches make vLLM's "auto" detection
+        # pass message content as OpenAI content-part lists, which the template's
+        # tools branch cannot concatenate ("can only concatenate list to list").
+        # Force plain-string content like the text-only Qwen3 serving path.
+        chat_template_content_format: string
+        # Qwen3-Omni ships its chat template in the processor's
+        # chat_template.json, not tokenizer_config.json, so vLLM chat serving
+        # cannot resolve one (ChatTemplateResolutionError). Inline the model's
+        # own template (supports tools + <think>).
+        chat_template: |
+          {%- if tools %}
+              {{- '<|im_start|>system\n' }}
+              {%- if messages[0].role == 'system' %}{{- messages[0].content + '\n\n' }}{%- endif %}
+              {{- "# Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>" }}
+              {%- for tool in tools %}
+                  {{- "\n" }}
+                  {{- tool | tojson }}
+              {%- endfor %}
+              {{- "\n</tools>\n\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\n<tool_call>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</tool_call><|im_end|>\n" }}
+          {%- else %}
+              {%- if messages[0].role == 'system' %}
+                  {%- if messages[0].content is string %}
+                      {{- '<|im_start|>system\n' + messages[0].content + '<|im_end|>\n' }}
+                  {%- else %}
+                      {%- for content in messages[0].content %}
+                          {%- if content.type == 'image' or 'image' in content or 'image_url' in content %}
+                              {{- '<|im_start|>system\n' +"<|vision_start|><|image_pad|><|vision_end|>"+ '<|im_end|>\n' }}
+                          {%- elif content.type == 'audio' or 'audio' in content or 'audio_url' in content %}
+                              {{- '<|im_start|>system\n' +"<|audio_start|><|audio_pad|><|audio_end|>"+ '<|im_end|>\n' }}
+                          {%- elif content.type == 'video' or 'video' in content %}
+                              {{- '<|im_start|>system\n' +"<|vision_start|><|video_pad|><|vision_end|>"+ '<|im_end|>\n' }}
+                          {%- elif content.type == 'text' %}
+                              {{- '<|im_start|>system\n' +content.text+ '<|im_end|>\n' }}
+                          {%- endif %}
+                      {%- endfor %}
+                  {%- endif %}
+              {%- endif %}
+          {%- endif %}
+          {%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}
+          {%- for message in messages[::-1] %}
+              {%- set index = (messages|length - 1) - loop.index0 %}
+              {%- if ns.multi_step_tool and message.role == "user" and message.content is string and not(message.content.startswith('<tool_response>') and message.content.endswith('</tool_response>')) %}
+                  {%- set ns.multi_step_tool = false %}
+                  {%- set ns.last_query_index = index %}
+              {%- endif %}
+          {%- endfor %}
+          {%- for message in messages %}
+              {%- if message.content is string %}
+                  {%- set content = message.content %}
+              {%- else %}
+                  {%- set content = namespace(text="") %}
+                  {%- for mcontent in message.content %}
+                      {%- if mcontent.type == 'image' or 'image' in mcontent or 'image_url' in mcontent %}
+                          {%- set content.text = content.text~"<|vision_start|><|image_pad|><|vision_end|>" %}
+                      {%- elif mcontent.type == 'audio' or 'audio' in mcontent or 'audio_url' in mcontent %}
+                          {%- set content.text = content.text~"<|audio_start|><|audio_pad|><|audio_end|>" %}
+                      {%- elif mcontent.type == 'video' or 'video' in mcontent %}
+                          {%- set content.text = content.text~"<|vision_start|><|video_pad|><|vision_end|>" %}
+                      {%- elif mcontent.type == 'text' %}
+                          {%- set content.text = content.text~mcontent.text %}
+                      {%- endif %}
+                  {%- endfor %}
+                  {%- set content = content.text %}
+              {%- endif %}
+              {%- if (message.role == "user") or (message.role == "system" and not loop.first) %}
+                  {{- '<|im_start|>' + message.role + '\n' + content + '<|im_end|>' + '\n' }}
+              {%- elif message.role == "assistant" %}
+                  {%- set reasoning_content = "" %}
+                  {%- if message.reasoning_content is string %}
+                      {%- set reasoning_content = message.reasoning_content %}
+                  {%- else %}
+                      {%- if '</think>' in content %}
+                      {%- set reasoning_content = content.split('</think>')[0].rstrip('\n').split('<think>')[-1].lstrip('\n') %}
+                      {%- set content = content.split('</think>')[-1].lstrip('\n') %}
+                  {%- endif %}
+              {%- endif %}
+              {%- if loop.index0 > ns.last_query_index %}
+                  {%- if loop.last or (not loop.last and reasoning_content) %}
+                      {{- '<|im_start|>' + message.role + '\n<think>\n' + reasoning_content.strip("\n") + '\n</think>\n\n' + content.lstrip('\n') }}
+                  {%- else %}
+                      {{- '<|im_start|>' + message.role + '\n' + content }}
+                  {%- endif %}
+              {%- else %}
+                  {{- '<|im_start|>' + message.role + '\n' + content }}
+              {%- endif %}
+              {%- if message.tool_calls %}
+                  {%- for tool_call in message.tool_calls %}
+                      {%- if (loop.first and content) or (not loop.first) %}{{- '\n' }}{%- endif %}
+                      {%- if tool_call.function %}
+                          {%- set tool_call = tool_call.function %}
+                      {%- endif %}
+                      {{- '<tool_call>\n{"name": "' }}
+                      {{- tool_call.name }}
+                      {{- '", "arguments": ' }}
+                      {%- if tool_call.arguments is string %}
+                          {{- tool_call.arguments }}
+                      {%- else %}
+                          {{- tool_call.arguments | tojson }}
+                      {%- endif %}
+                      {{- '}\n</tool_call>' }}
+                  {%- endfor %}
+              {%- endif %}
+              {{- '<|im_end|>\n' }}
+              {%- elif message.role == "tool" %}
+                  {%- if loop.first or (messages[loop.index0 - 1].role != "tool") %}{{- '<|im_start|>user' }}{%- endif %}
+                  {{- '\n<tool_response>\n' }}
+                  {{- content }}
+                  {{- '\n</tool_response>' }}
+                  {%- if loop.last or (messages[loop.index0 + 1].role != "tool") %}{{- '<|im_end|>\n' }}{%- endif %}
+              {%- endif %}
+          {%- endfor %}
+          {%- if add_generation_prompt %}
+              {#- Force the thinking block open, matching the Qwen3-Thinking-2507
+                  tokenizer template. The stock omni processor template leaves
+                  <think> optional, and GRPO then optimizes thinking away
+                  (generation length collapsed 1068->435 tokens by step 110 with
+                  val accuracy decaying in lockstep). -#}
+              {{- '<|im_start|>assistant\n<think>\n' }}
+          {%- endif %}
+logger:
+  wandb:
+    name: qwen3-omni-30b-thinking-tau1-pivot
+  mlflow:
+    experiment_name: qwen3-omni-30b-thinking-tau1-pivot
+    run_name: qwen3-omni-30b-thinking-tau1-pivot

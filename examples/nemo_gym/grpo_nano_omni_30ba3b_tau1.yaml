@@ -1,0 +1,57 @@
+# TAU1 conversational tool-use pivot recipe for
+# Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16, 4 nodes x 8 GPUs.
+#
+# Inherits the validated 1n8g smoke config (nano/omni model plumbing + tau1
+# algorithm settings) and scales the batch to the tau recipe (64 prompts x 16
+# generations, gbs 1024). The TP8/EP8 single-node replica layout carries over
+# unchanged: 4 nodes give DP=4.
+
+defaults: "grpo_nano_omni_30ba3b_tau1_smoke_1n8g.yaml"
+
+grpo:
+  num_prompts_per_step: 64
+  num_generations_per_prompt: 16
+  max_num_steps: 1000000
+  val_period: 10
+  val_batch_size: 256
+checkpointing:
+  enabled: true
+  checkpoint_dir: results/grpo-nano-omni-30b-tau1
+  higher_is_better: true
+  keep_top_k: 10
+  save_period: 10
+  model_save_format: safetensors
+  save_consolidated: false
+policy:
+  # Checkpointing.model_save_format is only honored on the _v2 save path.
+  dtensor_cfg:
+    _v2: true
+  train_global_batch_size: 1024
+  generation_batch_size: 32
+  # The pivot data has a long tail of prompts exceeding 16k tokens (hit at
+  # ~step 540: vLLM rejected the prompt, rollout returned no generation data,
+  # and dataloader-state resume would replay the same sample forever). 32k
+  # matches the 2507 recipe and covers the tail.
+  max_total_sequence_length: 32768
+  megatron_cfg:
+    scheduler:
+      # Resuming a checkpoint saved under a different grpo.max_num_steps trips
+      # "OptimizerParamScheduler: class input value ... and checkpoint value ...
+      # do not match" (the nanov3 base lacks this flag; lr is constant anyway).
+      override_opt_param_scheduler: true
+    distributed_data_parallel_config:
+      # With the frozen vision/sound towers, overlapped grad reduce trips
+      # "Should not have multiple communication calls outstanding at once" once
+      # DP>1 (invisible in the 1n8g smoke where DP=1).
+      overlap_grad_reduce: false
+      overlap_param_gather: false
+logger:
+  wandb_enabled: true
+  wandb:
+    project: nemo-rl-tau
+    name: nano-omni-30b-tau1-pivot
+  mlflow:
+    experiment_name: nano-omni-30b-tau1-pivot
+    run_name: nano-omni-30b-tau1-pivot
+cluster:
+  num_nodes: 4

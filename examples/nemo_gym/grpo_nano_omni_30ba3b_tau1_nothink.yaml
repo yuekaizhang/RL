@@ -1,0 +1,34 @@
+# No-thinking control arm for the nano-omni TAU1 pivot run: identical recipe,
+# but the chat template pre-closes the think block (enable_thinking=false), so
+# the model answers/calls tools directly without reasoning tokens.
+#
+# Parser note: with no <think> tags in the output, any DeepSeekR1-derived
+# reasoning parser classifies the whole output as reasoning and leaves content
+# empty, breaking tool-call extraction (observed: flat 0.0 reward, 128-token
+# generations). The local nano_v3 plugin's enable_thinking=false special case
+# does not trigger either, because Gym requests carry no per-request
+# chat_template_kwargs. Since no-think outputs contain no think tags at all,
+# the correct setup is NO reasoning parser: the full output is content and the
+# qwen3_coder tool parser operates on it directly.
+
+defaults: "grpo_nano_omni_30ba3b_tau1.yaml"
+
+checkpointing:
+  checkpoint_dir: results/grpo-nano-omni-30b-tau1-nothink
+policy:
+  tokenizer:
+    chat_template_kwargs:
+      enable_thinking: false
+  generation:
+    vllm_cfg:
+      reasoning_parser_plugin: null
+      http_server_serving_chat_kwargs:
+        reasoning_parser: null
+        default_chat_template_kwargs:
+          enable_thinking: false
+logger:
+  wandb:
+    name: nano-omni-30b-tau1-nothink
+  mlflow:
+    experiment_name: nano-omni-30b-tau1-nothink
+    run_name: nano-omni-30b-tau1-nothink
