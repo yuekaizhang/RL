@@ -1,0 +1,40 @@
+# GSPO + TIS from-scratch arm for the nano-omni TAU1 pivot recipe.
+#
+# Motivation (2026-09-01 debug): the plain-GRPO think arm's
+# token_mult_prob_error drift (1.06 -> 1.2 @ step 600) traced to a fat tail of
+# punctuation tokens where the RL-sharpened mamba weights make different
+# engine implementations disagree by up to e^10 (vLLM vs mcore vs automodel vs
+# HF eager all mutually inconsistent; fp32 does not reconcile). No single
+# engine is at fault, so the fix is loss-level robustness, three layers:
+#   1. GSPO (sequence-level ratios; official nano-omni VLM recipes use this)
+#      - length-normalization dilutes single-token spikes out of the clip;
+#   2. token-level IS correction with TIS cap - unbiases the gradient against
+#      train/gen mismatch; extreme weights are clamped;
+#   3. seq_logprob_error_threshold 1.5 - circuit breaker for pathological
+#      sequences (the inherited 2.0 already fired on step-600 weights).
+
+defaults: "grpo_nano_omni_30ba3b_tau1.yaml"
+
+grpo:
+  overlong_filtering: true
+  # Inherited threshold is 2 (nanov3 base); tighten to drop the worst tail.
+  seq_logprob_error_threshold: 1.5
+loss_fn:
+  # GSPO: sequence-level importance ratios require sequence-level loss.
+  sequence_level_importance_ratios: true
+  token_level_loss: false
+  # Restore the nanov3-base decoupled clip + on-policy KL approximation that
+  # the tau smoke turned off for paper fidelity (official omni recipes keep
+  # them on).
+  ratio_clip_max: 0.28
+  use_on_policy_kl_approximation: true
+  # Token-level engine-mismatch correction with truncation (swe1-style TIS).
+  use_importance_sampling_correction: true
+  truncated_importance_sampling_type: tis
+  truncated_importance_sampling_ratio: 5.0
+logger:
+  wandb:
+    name: nano-omni-30b-tau1-gspo-tis
+  mlflow:
+    experiment_name: nano-omni-30b-tau1-gspo-tis
+    run_name: nano-omni-30b-tau1-gspo-tis
