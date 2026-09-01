@@ -1,0 +1,78 @@
+# Automodel(DTensor/FSDP2)-backend probe for the nano-omni TAU1 smoke.
+#
+# Purpose: same data + same vLLM generation stack as the mcore smoke, but the
+# training/logprob side runs the HF model via the automodel backend. Comparing
+# step-1 gen_kl_error / token_mult_prob_error against the mcore smoke isolates
+# whether the tokmult drift seen in long-thinking nano runs originates in the
+# Megatron training-side numerics (mamba path / refit mapping) or elsewhere.
+
+defaults: "grpo_nano_omni_30ba3b_tau1_smoke_1n8g.yaml"
+
+grpo:
+  max_num_steps: 2
+policy:
+  megatron_cfg:
+    enabled: false
+  logprob_batch_size: 1
+  # DTensor settings mirror the proven automodel recipe for this model,
+  # vlm_grpo-nemotron-omni-30ba3b-clevr-1n8g-automodel-ep8.v1.yaml. EP8 is
+  # required: the custom MoE state-dict adapter asserts an "ep" mesh dim
+  # exists when converting merged expert weights back to HF for refit.
+  dtensor_cfg:
+    enabled: true
+    _v2: true
+    activation_checkpointing: true
+    tensor_parallel_size: 1
+    context_parallel_size: 1
+    expert_parallel_size: 8
+    sequence_parallel: false
+    cpu_offload: false
+    moe_parallelizer:
+      ignore_router_for_ac: true
+    env_vars:
+      PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+    automodel_kwargs:
+      backend:
+        _target_: nemo_automodel.components.models.common.utils.BackendConfig
+        attn: sdpa
+        linear: torch
+        rms_norm: torch_fp32
+        dispatcher: deepep
+        experts: torch_mm
+        fake_balanced_gate: false
+        rope_fusion: false
+        enable_hf_state_dict_adapter: true
+      # Text-only batches leave the towers gradient-free (same reason as the
+      # mcore freeze quartet).
+      freeze_config:
+        freeze_vision_tower: true
+        freeze_audio_tower: true
+        freeze_language_model: false
+  # HF mamba-hybrid forward with packed/varlen sequences is unproven; plain
+  # mbs=1 batching is enough for a 2-step probe.
+  sequence_packing:
+    enabled: false
+  dynamic_batching:
+    enabled: false
+  # The nanov3 base nulls the FSDP optimizer/scheduler (megatron owns them
+  # there); the dtensor path needs them back. Mirror the tau recipe: AdamW,
+  # constant lr 1e-6.
+  optimizer:
+    name: torch.optim.AdamW
+    kwargs:
+      lr: 1.0e-06
+      weight_decay: 0.01
+      betas:
+      - 0.9
+      - 0.999
+      eps: 1.0e-08
+      foreach: false
+      fused: false
+  scheduler:
+  - name: torch.optim.lr_scheduler.ConstantLR
+    kwargs:
+      factor: 1.0
+      total_iters: 10000000000
+  - milestones: []
+logger:
+  log_dir: logs
