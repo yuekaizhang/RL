@@ -1,0 +1,32 @@
+# DAPO-style dynamic-sampling arm on the nano_dadv0 dataset.
+#
+# Inherits the full GSPO + TIS + seq-threshold stack (validated to hold
+# gen_kl_error flat through step ~160) and adds:
+#   - data: datasets/conversational_tool_use_pivot_nano_dadv0 - nano
+#     self-profiled reward_mean <= 0.6 INCLUDING the all-zero rows
+#     (66,522 = 37,984 all-0 + 28,538 mixed), mirroring the paper's
+#     train_difficulty_60 structure (44.7% all-0 kept) on nano's own
+#     ability surface. All-zero rows are curriculum reserve: worthless
+#     until the policy can occasionally solve them, then high-signal.
+#   - dynamic sampling (DAPO): discard zero-variance prompt groups at
+#     rollout time and refill, so the 57% all-0 rows don't waste steps
+#     while they are still unsolvable.
+#
+# Data paths are supplied by the submit script via EXTRA_OVERRIDES_STR.
+
+defaults: "grpo_nano_omni_30ba3b_tau1_gspo_tis.yaml"
+
+grpo:
+  use_dynamic_sampling: true
+  # Oversample 2x (128 prompts -> keep the first 64 with reward variance).
+  # At start ~57% of rows are self-profiled all-0 and mostly zero-variance,
+  # so 2x keeps refill batches (dynamic_sampling_max_gen_batches) rare.
+  batch_multiplier: 2.0
+checkpointing:
+  keep_top_k: 5
+logger:
+  wandb:
+    name: nano-omni-30b-tau1-dapo-dadv0
+  mlflow:
+    experiment_name: nano-omni-30b-tau1-dapo-dadv0
+    run_name: nano-omni-30b-tau1-dapo-dadv0
