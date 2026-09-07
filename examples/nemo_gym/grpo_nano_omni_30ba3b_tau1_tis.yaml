@@ -1,0 +1,23 @@
+# TIS-only ablation of the GSPO+TIS arm: identical protective stack (token
+# level IS correction + TIS cap 5.0, seq_logprob_error_threshold 1.5, clip
+# 0.28, on-policy KL approx, overlong filtering) and identical data (E), but
+# plain GRPO token-level loss instead of GSPO sequence-level ratios/loss.
+#
+# Isolates the GSPO switches: the GSPO arm's tokmult stayed flat (1.07) but
+# its telecom behavior regressed (tool-bias from per-sequence loss weighting,
+# 0.362 vs think470's 0.504) while retail improved (0.669 vs 0.601). If this
+# arm keeps the flat tokmult AND think-like telecom, the drift protection is
+# attributable to TIS/threshold alone and sequence-level loss caused the
+# behavior shift.
+
+defaults: "grpo_nano_omni_30ba3b_tau1_gspo_tis.yaml"
+
+loss_fn:
+  sequence_level_importance_ratios: false
+  token_level_loss: true
+logger:
+  wandb:
+    name: nano-omni-30b-tau1-tis
+  mlflow:
+    experiment_name: nano-omni-30b-tau1-tis
+    run_name: nano-omni-30b-tau1-tis
