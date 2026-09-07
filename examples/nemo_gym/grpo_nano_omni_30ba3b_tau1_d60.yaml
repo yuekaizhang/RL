@@ -1,0 +1,17 @@
+# Paper-data arm: strictly the nano think recipe (plain GRPO, token-level
+# loss, clip 0.2/0.2, no IS correction), with ONLY the training data swapped
+# to the paper's original train_difficulty_60.jsonl (qwen-235b 16-rollout
+# reward_mean <= 0.6, 44.7% all-zero rows kept; 314,565 rows -> processed copy
+# at datasets/conversational_tool_use_pivot_difficulty60 with agent_ref
+# renamed to the new server name and val-overlapping rows dropped).
+# Validation stays the canonical 512-row split so curves remain comparable.
+# Data paths are supplied by the submit script via EXTRA_OVERRIDES_STR.
+
+defaults: "grpo_nano_omni_30ba3b_tau1.yaml"
+
+logger:
+  wandb:
+    name: nano-omni-30b-tau1-d60
+  mlflow:
+    experiment_name: nano-omni-30b-tau1-d60
+    run_name: nano-omni-30b-tau1-d60
