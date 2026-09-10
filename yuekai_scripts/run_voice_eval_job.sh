@@ -16,7 +16,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 $V/bin/vllm serve "$CKPT" --served-model-name "$TAG
   --tensor-parallel-size 4 --max-model-len 65536 --enable-auto-tool-choice \
   --tool-call-parser qwen3_coder --reasoning-parser nemotron_v3 \
   --mamba-ssm-cache-dtype float32 --trust-remote-code \
-  --gpu-memory-utilization 0.9 > $EVAL/voice_logs/serve_${TAG}.log 2>&1 &
+  --gpu-memory-utilization 0.9 ${EXTRA_VLLM_FLAGS:-} > $EVAL/voice_logs/serve_${TAG}.log 2>&1 &
 SERVE_PID=$!
 
 # chatterbox_venv was built against a uv-managed CPython under /root (gone in
