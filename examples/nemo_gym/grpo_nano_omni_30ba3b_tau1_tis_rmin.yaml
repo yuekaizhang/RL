@@ -1,0 +1,23 @@
+# TIS recipe x full public data x clean template + TIS ratio FLOOR 0.1.
+#
+# Arm B of the rendering/floor pair: identical to the tis-cleantpl arm (A)
+# except truncated_importance_sampling_ratio_min: 0.1 — fragile-token
+# importance weights are clamped to [0.1, 5.0] instead of [0, 5.0], so
+# structural tokens keep 10% gradient flow (anti-repetition signal) while
+# retaining ~90% of the drift protection. Hypothesis under test: the voice
+# empty-output rate (TIS arm 16-29% vs base 2-6% vs plain-GRPO 0-2%) is
+# caused by TIS zeroing those gradients; success = tokmult stays flat AND
+# empty-output rate returns to <=6%.
+#
+# Checkpoints must be evaluated with the same clean template.
+
+defaults: "grpo_nano_omni_30ba3b_tau1_tis_cleantpl.yaml"
+
+loss_fn:
+  truncated_importance_sampling_ratio_min: 0.1
+logger:
+  wandb:
+    name: nano-omni-30b-tau1-tis-rmin
+  mlflow:
+    experiment_name: nano-omni-30b-tau1-tis-rmin
+    run_name: nano-omni-30b-tau1-tis-rmin
