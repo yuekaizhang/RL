@@ -1,0 +1,258 @@
+# Nemotron 3.5 Super VL (NemotronH_Omni_Reasoning_V3, 120B-A12B hybrid Mamba+Attention
+# MoE) -- SWE Stage 1 "pivot" RL (PivotRL, single-step tool use with argument
+# comparison) on the AutoModel (DTensor/FSDP2) backend with async, non-colocated
+# vLLM generation through NeMo Gym. Text-only: the vision tower is built but never
+# receives images.
+#
+# Mirrors examples/nemo_gym/grpo_qwen3_30ba3b_thinking_swe1.yaml (algorithm, data,
+# environment, async settings) and examples/nemo_gym/nemotron-3-super/stage2_swe1.yaml
+# (Nemotron tool-call / thinking handling); training-side settings follow
+# examples/configs/recipes/llm/dapo-nemotron3.5-super-vl-120BA12B-16n4g-automodel.yaml.
+#
+# Sized for 4-GPU GB200 nodes: 8 training nodes (32 GPUs: FSDP2, EP4 within a node,
+# CP2 across a node pair, DP16) + 8 generation nodes (one TP4/EP4 vLLM engine each).
+# cluster.num_nodes is the sum (16). SWE pivot prompts are long (sampled
+# nvidia/Nemotron-RL-Agentic-SWE-Pivot-v1: p50 ~22K, p90 ~43K, max ~83K tokens), hence
+# max_total_sequence_length 131072 and context parallelism on the trainer.
+#
+# Requirements:
+#   - Automodel r0.6.0 @ b916107a5 or later (submodule pin of this branch).
+#   - Stock vLLM 0.29.0 (pyproject pin): registers NemotronH_Omni_Reasoning_V3 and
+#     ships the nemotron_v3 reasoning parser and qwen3_coder tool parser the GA chat
+#     template needs (<think> blocks, <tool_call><function=...> calls).
+#   - NeMo Gym venvs for single_step_tool_use_with_argument_comparison (prebaked in
+#     the container under NEMO_GYM_VENV_DIR, or built on first launch).
+#
+# Notes:
+#   - hf_config_overrides.num_nextn_predict_layers=0 drops the checkpoint's MTP head on
+#     the training side; keep generation speculative_config unset.
+#   - automodel_cfg.automodel_kwargs.force_hf must NOT be set (the custom NemotronOmni
+#     implementation + state-dict adapter are required for EP and per-tensor refit).
+#   - expert_parallel_size=4 keeps the EP group within one 4-GPU node; the HybridEP
+#     dispatcher needs make_sequence_length_divisible_by=64 (also a multiple of 2*CP).
+#   - Do not set automodel_cfg.env_vars.PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+#     (breaks the CUDA-IPC refit on some clusters).
+#   - vLLM loads the checkpoint's RADIO weights from disk (load_format=auto via
+#     ModelFlag.VLLM_LOAD_FORMAT_AUTO for model_type nemotron_h_omni); the language
+#     model is refit from the trainer every step (NCCL collective, non-colocated).
+
+defaults: "../grpo_workplace_assistant_nemotron_nano_v2_9b.yaml"
+
+checkpointing:
+  checkpoint_dir: results/grpo-nemotron3.5-super-vl-swe1-pivot-automodel
+  metric_name: train:total_reward/mean
+  higher_is_better: true
+  keep_top_k: 2
+  save_period: 5
+  # 4h partition limit; leave >= 40 min so the timeout save + exit never straddles the
+  # wall clock.
+  checkpoint_must_save_by: 00:03:20:00
+  save_optimizer: true
+
+grpo:
+  num_prompts_per_step: 64
+  num_generations_per_prompt: 8
+  val_num_generations_per_prompt: 1
+  max_rollout_turns: 1
+  max_num_epochs: 100
+  normalize_rewards: true
+  use_leave_one_out_baseline: true
+  advantage_clip_low: -100
+  advantage_clip_high: 100
+  val_period: 1000
+  val_at_start: false
+  overlong_filtering: true
+  val_batch_size: 256
+  # Assign a fixed negative advantage to malformed tool calls / <think> tags
+  # (patterns come from env.nemo_gym.invalid_tool_call_patterns / thinking_tags).
+  invalid_tool_call_advantage: -5.0
+  malformed_thinking_advantage: -5.0
+  reward_shaping:
+    stop_properly_penalty_coef: null
+  async_grpo:
+    enabled: true
+    max_trajectory_age_steps: 1
+    max_generation_failures: 3
+    in_flight_weight_updates: true
+    recompute_kv_cache_after_weight_updates: false
+
+loss_fn:
+  reference_policy_kl_penalty: 0.0
+  kl_input_clamp_value: null
+  kl_output_clamp_value: null
+  ratio_clip_min: 0.2
+  ratio_clip_max: 0.28
+  ratio_clip_c: null
+  use_on_policy_kl_approximation: true
+  use_importance_sampling_correction: true
+  truncated_importance_sampling_ratio: 5.0
+  truncated_importance_sampling_ratio_min: null
+  truncated_importance_sampling_type: tis
+  sequence_level_importance_ratios: false
+  token_level_loss: true
+  force_on_policy_ratio: true
+  use_kl_in_reward: false
+
+policy:
+  model_name: nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16
+  tokenizer:
+    name: ${policy.model_name}
+    # The GA chat template defaults to enable_thinking=true; the server-side
+    # default_chat_template_kwargs below keep history thinking across turns.
+    chat_template_kwargs: null
+  hf_config_overrides:
+    num_nextn_predict_layers: 0
+  # One optimizer step per GRPO step (all 64 x 8 rollouts). Must be a multiple of the
+  # trainer data-parallel size (train GPUs / CP = 32 / 2 = 16).
+  train_global_batch_size: 512
+  train_micro_batch_size: 1
+  generation_batch_size: 64
+  logprob_batch_size: 1
+  logprob_chunk_size: 2048
+  max_total_sequence_length: 131072
+  make_sequence_length_divisible_by: 64
+  precision: bfloat16
+  offload_optimizer_for_logprob: true
+  optimizer:
+    name: transformer_engine.pytorch.optimizers.fused_adam.FusedAdam
+    kwargs:
+      lr: 1.0e-06
+      weight_decay: 0.0
+      betas: [0.9, 0.999]
+      eps: 1.0e-08
+      master_weights: true
+      store_param_remainders: true
+      exp_avg_dtype: torch.bfloat16
+      exp_avg_sq_dtype: torch.bfloat16
+  scheduler:
+  - name: torch.optim.lr_scheduler.ConstantLR
+    kwargs:
+      factor: 1.0
+      total_iters: 10000000000
+  - milestones: []
+  dynamic_batching:
+    enabled: false
+  sequence_packing:
+    enabled: false
+  automodel_cfg:
+    enabled: true
+    tensor_parallel_size: 1
+    context_parallel_size: 2
+    expert_parallel_size: 4
+    sequence_parallel: false
+    activation_checkpointing: true
+    cpu_offload: false
+    moe_parallelizer:
+      ignore_router_for_ac: true
+    automodel_kwargs:
+      backend:
+        _target_: nemo_automodel.components.models.common.utils.BackendConfig
+        attn: te
+        linear: te
+        rms_norm: torch_fp32
+        experts: gmm
+        dispatcher: hybridep
+        fake_balanced_gate: false
+        rope_fusion: false
+        enable_hf_state_dict_adapter: true
+  megatron_cfg:
+    enabled: false
+  generation:
+    port_range_low: 3000
+    port_range_high: 4999
+    max_new_tokens: ${policy.max_total_sequence_length}
+    vllm_cfg:
+      async_engine: true
+      tensor_parallel_size: 4
+      expert_parallel_size: 4
+      gpu_memory_utilization: 0.8
+      max_model_len: ${policy.max_total_sequence_length}
+      # Prompts can reach ~83K tokens: cap max_tokens so prompt + response fits.
+      cap_max_tokens_to_context: true
+      enable_prefix_caching: true
+      enforce_eager: false
+      expose_http_server: true
+      skip_tokenizer_init: false
+      enable_vllm_metrics_logger: true
+      vllm_metrics_logger_interval: 0.5
+      reasoning_parser_plugin: null
+      http_server_serving_chat_kwargs:
+        enable_auto_tools: true
+        tool_parser: qwen3_coder
+        reasoning_parser: nemotron_v3
+        default_chat_template_kwargs:
+          enable_thinking: true
+          truncate_history_thinking: false
+    vllm_kwargs:
+      moe_backend: triton
+      mamba_ssm_cache_dtype: float32
+      # No images are ever sent, but vLLM still builds the multimodal encoder budget
+      # for this architecture: skip the profiling pass, drop the default 4 GiB
+      # host-side processor cache, and bound the per-prompt image limit.
+      skip_mm_profiling: true
+      mm_processor_cache_gb: 0
+      limit_mm_per_prompt:
+        image: 1
+      compilation_config:
+        cudagraph_capture_sizes: [1, 2, 4, 8, 16, 32, 64]
+    colocated:
+      enabled: false
+      resources:
+        gpus_per_node: 4
+        num_nodes: 8
+
+data:
+  max_input_seq_length: null
+  shuffle: false
+  num_workers: 1
+  use_multiple_dataloader: false
+  train:
+    data_path: /path/to/data/swe1/train-split.jsonl
+  validation:
+    data_path: /path/to/data/swe1/val-split.jsonl
+  default:
+    dataset_name: NemoGymDataset
+    env_name: nemo_gym
+    prompt_file: null
+    system_prompt_file: null
+    processor: nemo_gym_data_processor
+  _override_: true
+
+env:
+  should_use_nemo_gym: true
+  should_log_nemo_gym_responses: false
+  # false: ignore env mask_sample flags so the loss trains on every sample.
+  should_mask_flagged_samples: true
+  nemo_gym:
+    skip_venv_if_present: true
+    port_range_low: 5000
+    port_range_high: 5999
+    invalid_tool_call_patterns:
+    - "<tool_call>"
+    - "</tool_call>"
+    - "<function_call>"
+    - "</function_call>"
+    thinking_tags:
+    - "<think>"
+    - "</think>"
+    config_paths:
+    - responses_api_models/vllm_model/configs/vllm_model_for_training.yaml
+    - resources_servers/single_step_tool_use_with_argument_comparison/configs/swe_pivot_single_step_tool_use_with_argument_comparison.yaml
+  _override_: true
+
+logger:
+  log_dir: logs/grpo-nemotron3.5-super-vl-swe1-pivot-automodel
+  wandb_enabled: true
+  tensorboard_enabled: true
+  monitor_gpus: true
+  wandb:
+    project: nemo-rl-super-3.5
+    name: grpo-nemotron3.5-super-vl-swe1-pivot-automodel
+  mlflow:
+    experiment_name: grpo-nemotron3.5-super-vl-swe1-pivot-automodel
+    run_name: grpo-nemotron3.5-super-vl-swe1-pivot-automodel
+
+cluster:
+  gpus_per_node: 4
+  # 8 training + 8 generation nodes (policy.generation.colocated.resources.num_nodes).
+  num_nodes: 16
