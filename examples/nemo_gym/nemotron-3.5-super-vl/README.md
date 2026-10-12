@@ -1,4 +1,19 @@
-# Nemotron 3.5 Super VL — SWE Stage 1 (pivot) RL on the AutoModel backend
+# Nemotron 3.5 Super VL — NeMo Gym agentic RL on the AutoModel backend
+
+Two text-only NeMo Gym recipes for Nemotron 3.5 Super VL (`NemotronH_Omni_Reasoning_V3`,
+120B-A12B) with async, non-colocated stock vLLM 0.29 generation:
+
+| Recipe | Task | Rollout | Nodes (4-GPU GB200) |
+|---|---|---|---|
+| `workplace_assistant_automodel.yaml` | NeMo Gym `workplace_assistant`: multi-step tool use (<= 6 tool steps, one user turn) against simulated databases, no code sandbox | 64 prompts x 16, 16K context | 4 train + 4 gen = 8 |
+| `swe1_pivot_automodel.yaml` | SWE Stage 1 pivot (PivotRL single-step tool use with argument comparison) | 64 prompts x 8, 131K context, CP2 | 8 train + 8 gen = 16 |
+
+`workplace_assistant_automodel.yaml` inherits everything but the task from the SWE1 recipe;
+its data is `nvidia/Nemotron-RL-agent-workplace_assistant` (`train.jsonl` 1,255 rows,
+`validation.jsonl` 545 rows), launched the same way with `data.train.data_path` /
+`data.validation.data_path` pointing at those files.
+
+## SWE Stage 1 (pivot)
 
 `swe1_pivot_automodel.yaml` runs the SWE **pivot** stage (PivotRL, single-step tool use
 with argument comparison; see [`docs/guides/swe-rl-qwen3.md`](../../../docs/guides/swe-rl-qwen3.md))

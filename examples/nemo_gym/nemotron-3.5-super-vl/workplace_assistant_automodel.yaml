@@ -1,0 +1,82 @@
+# Nemotron 3.5 Super VL (NemotronH_Omni_Reasoning_V3, 120B-A12B) -- NeMo Gym
+# workplace_assistant (multi-step tool use, single user turn, up to 6 tool steps,
+# simulated databases, no code sandbox) on the AutoModel backend with async
+# non-colocated vLLM generation. Text-only.
+#
+# Shares the trainer / generation / async settings with swe1_pivot_automodel.yaml
+# and swaps in the workplace_assistant task (same shape as
+# grpo_workplace_assistant_nemotron_nano_v2_9b.yaml: 64 prompts x 16 generations,
+# validation every 10 steps). Prompts are ~4.5K tokens and trajectories short, so
+# the context drops to 16K and the trainer needs no context parallelism.
+#
+# Sized for 4-GPU GB200 nodes: 4 training nodes (16 GPUs: FSDP2, EP4, DP16) +
+# 4 generation nodes (one TP4/EP4 vLLM engine each); cluster.num_nodes is the sum.
+
+defaults: swe1_pivot_automodel.yaml
+
+checkpointing:
+  checkpoint_dir: results/grpo-nemotron3.5-super-vl-workplace-assistant-automodel
+  metric_name: val:total_reward/mean
+  save_period: 10
+
+grpo:
+  num_prompts_per_step: 64
+  num_generations_per_prompt: 16
+  val_period: 10
+  val_at_start: true
+  val_batch_size: null
+  max_val_samples: null
+  overlong_filtering: false
+
+policy:
+  train_global_batch_size: 1024
+  max_total_sequence_length: 16384
+  automodel_cfg:
+    context_parallel_size: 1
+  generation:
+    max_new_tokens: 8192
+    vllm_cfg:
+      max_model_len: ${policy.max_total_sequence_length}
+    colocated:
+      enabled: false
+      resources:
+        gpus_per_node: 4
+        num_nodes: 4
+
+data:
+  train:
+    data_path: /path/to/data/workplace_assistant/train.jsonl
+  validation:
+    data_path: /path/to/data/workplace_assistant/validation.jsonl
+
+env:
+  should_use_nemo_gym: true
+  should_log_nemo_gym_responses: false
+  should_mask_flagged_samples: true
+  nemo_gym:
+    skip_venv_if_present: true
+    port_range_low: 5000
+    port_range_high: 5999
+    config_paths:
+    - responses_api_models/vllm_model/configs/vllm_model_for_training.yaml
+    - resources_servers/workplace_assistant/configs/workplace_assistant.yaml
+    policy_model:
+      responses_api_models:
+        vllm_model:
+          uses_reasoning_parser: true
+          chat_template_kwargs:
+            enable_thinking: true
+            truncate_history_thinking: false
+  _override_: true
+
+logger:
+  log_dir: logs/grpo-nemotron3.5-super-vl-workplace-assistant-automodel
+  wandb:
+    name: grpo-nemotron3.5-super-vl-workplace-assistant-automodel
+  mlflow:
+    experiment_name: grpo-nemotron3.5-super-vl-workplace-assistant-automodel
+    run_name: grpo-nemotron3.5-super-vl-workplace-assistant-automodel
+
+cluster:
+  gpus_per_node: 4
+  num_nodes: 8
