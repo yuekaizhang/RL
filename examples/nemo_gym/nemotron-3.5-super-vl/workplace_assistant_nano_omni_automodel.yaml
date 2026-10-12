@@ -22,12 +22,9 @@ policy:
     name: ${policy.model_name}
   # Nano Omni ships no MTP head; the Super VL override is harmless but not needed.
   hf_config_overrides: {}
-  automodel_cfg:
-    # Non-colocated NCCL refit tolerates expandable segments (only the colocated
-    # CUDA-IPC refit does not); it removes the ~11 GB of allocator fragmentation
-    # seen before the step-2 OOM.
-    env_vars:
-      PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+  # Do not enable PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True here: with the
+  # non-colocated NCCL refit it produced NaN generation logprobs in vLLM right after
+  # the first weight broadcast (every rollout failed with HTTP 500).
   generation:
     vllm_cfg:
       tensor_parallel_size: 4
