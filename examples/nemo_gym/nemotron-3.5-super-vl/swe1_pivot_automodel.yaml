@@ -190,6 +190,10 @@ policy:
     vllm_kwargs:
       moe_backend: triton
       mamba_ssm_cache_dtype: float32
+      # vLLM's chunked-prefill default budget is 2048 tokens per scheduler step; the
+      # multi-step tool-use rollouts here re-prefill 4-20K-token prompts on every
+      # agent step, so raise it (same value as the Nano Omni CLEVR automodel recipe).
+      max_num_batched_tokens: 16384
       # No images are ever sent, but vLLM still builds the multimodal encoder budget
       # for this architecture: skip the profiling pass, drop the default 4 GiB
       # host-side processor cache, and bound the per-prompt image limit.
