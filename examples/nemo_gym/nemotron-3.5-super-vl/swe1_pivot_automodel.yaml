@@ -169,7 +169,11 @@ policy:
       max_model_len: ${policy.max_total_sequence_length}
       # Prompts can reach ~83K tokens: cap max_tokens so prompt + response fits.
       cap_max_tokens_to_context: true
-      enable_prefix_caching: true
+      # Keep prefix caching OFF for this hybrid Mamba model: with it on, multi-step
+      # tool-use trajectories (later steps hit the cached Mamba state of the earlier
+      # ones) showed token_mult_prob_error 1.45 / gen_kl_error 0.057 vs 1.02 / 0.0008
+      # with it off (Nemotron 3 Nano Omni proxy, NeMo Gym workplace_assistant).
+      enable_prefix_caching: false
       enforce_eager: false
       expose_http_server: true
       skip_tokenizer_init: false
