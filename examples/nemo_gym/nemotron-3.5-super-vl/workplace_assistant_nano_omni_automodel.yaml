@@ -1,0 +1,42 @@
+# Small-model stand-in for workplace_assistant_automodel.yaml: Nemotron 3 Nano Omni
+# 30B-A3B (NemotronH_Nano_Omni_Reasoning_V3) runs through the same Automodel
+# NemotronOmni implementation, Gym environment, parsers and async non-colocated
+# vLLM path as Nemotron 3.5 Super VL, so it is the cheap place to iterate before
+# moving a change to the 120B recipe. Text-only.
+#
+# 2 x 4-GPU GB200 nodes: 1 training node (FSDP2, EP4, DP4) + 1 generation node (TP4).
+# Keep EP >= 2: with EP1 the Omni fp32 parameter holders share an FSDP group with
+# bf16 parameters and FSDP2 rejects the mixed dtypes.
+
+defaults: workplace_assistant_automodel.yaml
+
+checkpointing:
+  checkpoint_dir: results/grpo-nemotron3-nano-omni-workplace-assistant-automodel
+
+policy:
+  model_name: nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16
+  tokenizer:
+    name: ${policy.model_name}
+  # Nano Omni ships no MTP head; the Super VL override is harmless but not needed.
+  hf_config_overrides: {}
+  generation:
+    vllm_cfg:
+      tensor_parallel_size: 4
+      expert_parallel_size: 1
+    colocated:
+      enabled: false
+      resources:
+        gpus_per_node: 4
+        num_nodes: 1
+
+logger:
+  log_dir: logs/grpo-nemotron3-nano-omni-workplace-assistant-automodel
+  wandb:
+    name: grpo-nemotron3-nano-omni-workplace-assistant-automodel
+  mlflow:
+    experiment_name: grpo-nemotron3-nano-omni-workplace-assistant-automodel
+    run_name: grpo-nemotron3-nano-omni-workplace-assistant-automodel
+
+cluster:
+  gpus_per_node: 4
+  num_nodes: 2
