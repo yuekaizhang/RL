@@ -94,11 +94,13 @@ policy:
   make_sequence_length_divisible_by: 64
   precision: bfloat16
   offload_optimizer_for_logprob: true
+  # Same optimizer settings as the other Super VL recipes (text DAPO, CLEVR GRPO);
+  # the Nano v2 9B values (5e-6 / 0.01) are too aggressive for the 120B MoE.
   optimizer:
     name: transformer_engine.pytorch.optimizers.fused_adam.FusedAdam
     kwargs:
-      lr: 5.0e-06
-      weight_decay: 0.01
+      lr: 1.0e-06
+      weight_decay: 0.1
       betas: [0.9, 0.999]
       eps: 1.0e-08
       master_weights: true
