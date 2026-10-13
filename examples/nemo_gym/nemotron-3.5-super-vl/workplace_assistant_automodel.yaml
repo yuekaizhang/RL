@@ -93,7 +93,11 @@ policy:
   logprob_batch_size: 1
   logprob_chunk_size: 2048
   max_total_sequence_length: 16384
-  make_sequence_length_divisible_by: 64
+  # HybridEP sizes its buffer from the per-rank token count of the first dispatch and
+  # JIT-compiles kernels that require it to be a multiple of its token chunk (128):
+  # with CP2 each rank sees half the padded sequence, so pad to 256 (a 4864-token
+  # batch -> 2432 per rank failed the kernel's static_assert).
+  make_sequence_length_divisible_by: 256
   precision: bfloat16
   offload_optimizer_for_logprob: true
   # Same optimizer settings as the other Super VL recipes (text DAPO, CLEVR GRPO);
