@@ -53,6 +53,8 @@ checkpointing:
 grpo:
   num_prompts_per_step: 64
   num_generations_per_prompt: 16
+  # 1255 training prompts / 64 per step is ~20 steps per epoch; do not stop there.
+  max_num_epochs: 100
   val_period: 10
   val_at_start: true
   val_batch_size: null
@@ -63,6 +65,16 @@ grpo:
     max_generation_failures: 3
     in_flight_weight_updates: true
     recompute_kv_cache_after_weight_updates: false
+
+loss_fn:
+  # Async GRPO trains on trajectories up to max_trajectory_age_steps old, so correct
+  # for the generation/trainer mismatch (same settings as the SWE1 pivot recipe).
+  use_on_policy_kl_approximation: true
+  use_importance_sampling_correction: true
+  truncated_importance_sampling_ratio: 5.0
+  truncated_importance_sampling_ratio_min: null
+  truncated_importance_sampling_type: tis
+  sequence_level_importance_ratios: false
 
 policy:
   model_name: nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16
