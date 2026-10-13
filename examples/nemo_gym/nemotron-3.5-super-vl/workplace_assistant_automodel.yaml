@@ -10,10 +10,12 @@
 # model, the AutoModel trainer and the Nemotron 3.5 tool-call / thinking handling.
 #
 # Sized for 4-GPU GB200 nodes: 8 training nodes (32 GPUs: FSDP2, EP4 within a node,
-# DP32) + 8 generation nodes (one TP4/EP4 vLLM engine each); cluster.num_nodes is the
-# sum (16). Prompts are ~4.5K tokens and trajectories short, so 16K context and no
-# context parallelism on the trainer. The same pipeline was validated for 20 steps on
-# the Nemotron 3 Nano Omni 30B-A3B stand-in (workplace_assistant_nano_omni_automodel.yaml).
+# CP2 across a node pair, DP16) + 8 generation nodes (one TP4/EP4 vLLM engine each);
+# cluster.num_nodes is the sum (16). Prompts are ~4.5K tokens and trajectories short,
+# so 16K context is enough; CP2 is still needed because without it the step-1 backward
+# of a 16K sample OOMs on the 120B trainer (150 GiB allocated + an 8 GiB request on
+# 184 GiB). The same pipeline was validated for 20 steps on the Nemotron 3 Nano Omni
+# 30B-A3B stand-in (workplace_assistant_nano_omni_automodel.yaml, CP1).
 #
 # Requirements:
 #   - Automodel r0.6.0 @ b916107a5 or later (submodule pin of this branch).
@@ -86,7 +88,7 @@ policy:
   hf_config_overrides:
     num_nextn_predict_layers: 0
   # train_global_batch_size = 64 x 16 = 1024 (inherited), one optimizer step per GRPO
-  # step. Must be a multiple of the trainer data-parallel size (32 train GPUs).
+  # step. Must be a multiple of the trainer data-parallel size (32 train GPUs / CP2 = 16).
   train_micro_batch_size: 1
   logprob_batch_size: 1
   logprob_chunk_size: 2048
@@ -116,7 +118,7 @@ policy:
   automodel_cfg:
     enabled: true
     tensor_parallel_size: 1
-    context_parallel_size: 1
+    context_parallel_size: 2
     expert_parallel_size: 4
     sequence_parallel: false
     activation_checkpointing: true

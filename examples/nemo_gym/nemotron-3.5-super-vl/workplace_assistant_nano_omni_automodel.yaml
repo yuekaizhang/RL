@@ -22,6 +22,9 @@ policy:
     name: ${policy.model_name}
   # Nano Omni ships no MTP head; the Super VL override is harmless but not needed.
   hf_config_overrides: {}
+  # 30B fits a 16K sample without context parallelism (validated for 20 steps).
+  automodel_cfg:
+    context_parallel_size: 1
   # Do not enable PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True here: with the
   # non-colocated NCCL refit it produced NaN generation logprobs in vLLM right after
   # the first weight broadcast (every rollout failed with HTTP 500).
