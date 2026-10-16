@@ -76,17 +76,23 @@ def packed_broadcast_producer(
         torch.empty(0, dtype=torch.uint8, device="cuda") for _ in range(num_buffers)
     ]
 
+    # The iterator is driven from alternating streams, but the work it enqueues
+    # for one item (e.g. an FSDP2 all-gather whose completion ``full_tensor()``
+    # registers only on the stream that was current at the time) may be read by
+    # the *next* item on the other stream: the state-dict adapter yields several
+    # per-expert views of one gathered tensor, and a multi-GB expert parameter
+    # always straddles a buffer boundary. Carry the previous stream's export
+    # dependencies over to the new stream with an event recorded *before* the
+    # previous broadcast is issued, so packing of buffer k+1 still overlaps the
+    # broadcast of buffer k and no host synchronization is added.
+    export_done: torch.cuda.Event | None = None
     while True:
         # Move to the next buffer
         buffer_idx = (buffer_idx + 1) % num_buffers
-        # Join every side stream before this buffer is reused. Waiting only on
-        # the buffer's own stream let the export of the next buffer (on the
-        # other stream) overlap the in-flight broadcast of this one, and with a
-        # multi-node trainer (FSDP2 full_tensor all-gathers in the iterator) the
-        # receivers got corrupted weights. Receiving still overlaps with the
-        # consumer's unpack/load; only the producer-side overlap is given up.
-        for stream in streams:
-            stream.synchronize()
+        # Synchronize the current stream
+        streams[buffer_idx].synchronize()
+        if export_done is not None:
+            streams[buffer_idx].wait_event(export_done)
         # Start tasks for the new buffer in a new stream
         with torch.cuda.stream(streams[buffer_idx]):  # type: ignore[arg-type]
             try:
@@ -115,6 +121,8 @@ def packed_broadcast_producer(
                 packed_tensors[buffer_idx] = torch.cat(
                     packing_tensor_list[buffer_idx], dim=0
                 )
+                export_done = torch.cuda.Event()
+                export_done.record(streams[buffer_idx])
                 group.broadcast(packed_tensors[buffer_idx], src=src)
             except StopIteration:
                 # do the last broadcast if there are remaining tensors
@@ -198,12 +206,8 @@ def _packed_broadcast_consumer_batches(
         while True:
             # Move to the next buffer
             buffer_idx = (buffer_idx + 1) % num_buffers
-            # Join every side stream before this buffer is reused: the weight
-            # loader may still be reading yielded slices of it from the other
-            # buffer's stream (deferred weight_loader replays), and the next
-            # broadcast would otherwise overwrite them.
-            for stream in streams:
-                stream.synchronize()
+            # Synchronize the current stream before its buffer is reused.
+            streams[buffer_idx].synchronize()
             with torch.cuda.stream(streams[buffer_idx]):  # type: ignore[arg-type]
                 # Initialize the packing tensor meta data
                 packing_tensor_meta_data[buffer_idx] = []
