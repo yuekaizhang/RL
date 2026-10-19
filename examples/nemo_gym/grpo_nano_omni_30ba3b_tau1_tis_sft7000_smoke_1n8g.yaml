@@ -23,7 +23,10 @@ policy:
   generation:
     vllm_cfg:
       http_server_serving_chat_kwargs:
-        chat_template: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_nemorl/users/yuekaiz/pivot_rl/RL-voicechat/examples/nemo_gym/nano_omni_chat_template_sysfix.jinja
+        # B3/B31: use the checkpoint's own SFT template with string content
+        # rendering; do not substitute a base-model template.
+        chat_template: null
+        chat_template_content_format: string
 logger:
   wandb_enabled: false
   mlflow_enabled: false

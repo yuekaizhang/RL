@@ -227,6 +227,27 @@ Probe: `scripts/audit/gradsync_check/`; re-run after changing the parallel layou
 - **Fix:** Overlay just the node-local extracted MCore `datasets` directory as writable. The original immutable run/archive and the remaining source mount are unchanged; native helper compilation and its barrier are retained.
 - **Check:** `bash -n voicechat/tools/gpu_job.sh`, frozen launcher tests, and a fresh native smoke must get past helper compilation on both learner nodes.
 
+## B29. Async-engine subprocesses missed the NeMo audio dispatch
+
+- **Symptom:** a `nemo_transformer` checkpoint crashes at engine startup with `AttributeError: 'SoundConfig' object has no attribute 'subsampling_conv_kernel_size'` (EngineCore multimodal profiling) even though the parent worker's `install_nemo_audio()` ran and `worker_cls=NemoAudioVllmWorker` is set.
+- **Cause:** the async engine spawns EngineCore in a fresh process and RayExecutorV2 creates RayWorkerProc actors; neither inherits the parent-process dispatch install, and both construct the sound tower (processor profiling / worker init) before `NemoAudioVllmWorker.load_model` runs.
+- **Fix:** `nemo_rl/models/generation/vllm/patches.py` installs the dispatch inside `run_engine_core` and `RayWorkerProc.initialize_worker` (vllm_config from `self._init_kwargs`; RayWorkerProc defers `WorkerProc.__init__`). Non-audio checkpoints are unaffected (install is a no-op for Parakeet configs).
+- **Check:** set `NRL_NEMO_AUDIO_TRACE=<file>` and run the 1n8g smoke; every EngineCore/RayWorkerProc pid must log `install ... True`, and no `SoundConfig` AttributeError appears.
+
+## B30. Mamba decode-cache refresh reads freed memory during colocated offload
+
+- **Symptom:** colocated NeMo-RL dies right after the first refit with `CUDA error: an illegal memory access was encountered` surfacing at `offload_after_refit`'s allocator wake-up; CUDA_LAUNCH_BLOCKING places the fault in `mamba_mixer.refresh_cache`.
+- **Cause:** `MambaMixer.train(False)` eagerly refreshes `_A_neg_exp_cache` from `A_log`, but during post-refit weight offload `A_log`'s storage is already freed; the eager refresh (added for CUDA-graph replay) then reads freed device memory. The validated non-colocated recipe never runs eval() in that window, so this only bites colocated runs.
+- **Fix:** `voicechat/third_party/megatron-lm-patches/0004-...patch` skips the eager refresh when either tensor's storage is gone; the lazy path in `_get_decode_A_neg_exp` refreshes once weights are restored. Apply with the existing bundle on a fresh third-party fetch.
+- **Check:** colocated 1n8g smoke passes refit + offload with no AcceleratorError; non-colocated behavior unchanged (guard only triggers on freed storage).
+
+## B31. tau_nano35 SFT chat template rejects content-part lists outright
+
+- **Symptom:** with `chat_template_content_format: "auto"` (the B3 hazard), the tau_nano35 SFT checkpoints fail rendering with `TypeError: can only concatenate str (not "list") to str` instead of silently printing a list repr like the base Omni template.
+- **Cause:** deshr's SFT template differs from the base Omni template; its string concatenation raises on part-list content rather than stringifying it.
+- **Fix:** none needed beyond B3 — keep `chat_template_content_format: "string"` and the checkpoint's own template. Do NOT substitute a base-model template (e.g. a patched base `sysfix` template): the SFT was trained with its own template and a substitute changes the rendering distribution.
+- **Check:** `apply_chat_template` on string-content messages renders clean `<|im_start|>` turns; the pivot RL smoke trains with finite rewards.
+
 ## Files changed relative to the upstream baseline (audit entry points)
 
 ```

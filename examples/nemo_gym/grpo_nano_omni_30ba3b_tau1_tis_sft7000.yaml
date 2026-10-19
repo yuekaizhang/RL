@@ -13,6 +13,14 @@ policy:
   model_name: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_nemorl/users/yuekaiz/pivot_rl/ckpts/sft7000_rl_hf
   tokenizer:
     name: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_nemorl/users/yuekaiz/pivot_rl/ckpts/sft7000_rl_hf
+  generation:
+    vllm_cfg:
+      http_server_serving_chat_kwargs:
+        # B3/B31: the cleantpl chain substitutes a patched BASE-model template
+        # (sysfix); this SFT ckpt was trained with its own template, so use it
+        # with string content rendering instead.
+        chat_template: null
+        chat_template_content_format: string
 logger:
   wandb:
     name: sft7000-tau1-tis-cleantpl
