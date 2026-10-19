@@ -1,0 +1,21 @@
+# SFT-warm-start arm v2 on the voicechat fork (nemo_transformer RoPE audio
+# encoder support): identical recipe/data to the yuekaiz-fork sft18k/cleantpl
+# arm (TIS stack + clean template + public 96K pivot), ONLY the starting model
+# changes — deshr's tau_nano35 step-7000 SFT checkpoint, STAGED via
+# voicechat/tools/stage_rope_audio_hf.py (Bridge audio runtime assets packaged;
+# see voicechat/docs/ROPE_AUDIO.md).
+# wandb goes to the forge.coreweave.com account (launcher exports
+# WANDB_BASE_URL + WANDB_API_KEY and sets logger.wandb.entity).
+
+defaults: "grpo_nano_omni_30ba3b_tau1_tis_cleantpl.yaml"
+
+policy:
+  model_name: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_nemorl/users/yuekaiz/pivot_rl/ckpts/sft7000_rl_hf
+  tokenizer:
+    name: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_nemorl/users/yuekaiz/pivot_rl/ckpts/sft7000_rl_hf
+logger:
+  wandb:
+    name: sft7000-tau1-tis-cleantpl
+  mlflow:
+    experiment_name: sft7000-tau1-tis-cleantpl
+    run_name: sft7000-tau1-tis-cleantpl

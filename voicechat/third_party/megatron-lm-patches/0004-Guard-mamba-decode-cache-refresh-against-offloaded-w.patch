@@ -1,0 +1,41 @@
+From e768e9686bcf1125f396366e2698b191f3e0bb9f Mon Sep 17 00:00:00 2001
+From: Yuekai Zhang <yuekaiz@nvidia.com>
+Date: Mon, 19 Oct 2026 00:34:58 -0700
+Subject: [PATCH] Guard mamba decode-cache refresh against offloaded weights
+
+eval() runs during NeMo-RL's colocated post-refit weight offload, where
+A_log's storage is already freed; refreshing the decode cache then reads
+freed device memory (CUDA illegal access). Skip the eager refresh when
+either tensor's storage is gone - the lazy path in _get_decode_A_neg_exp
+refreshes once weights are restored.
+
+Signed-off-by: Yuekai Zhang <yuekaiz@nvidia.com>
+---
+ megatron/core/ssm/mamba_mixer.py | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/megatron/core/ssm/mamba_mixer.py b/megatron/core/ssm/mamba_mixer.py
+index fb0d1923a..a662a2ca7 100644
+--- a/megatron/core/ssm/mamba_mixer.py
++++ b/megatron/core/ssm/mamba_mixer.py
+@@ -1067,7 +1067,16 @@ class MambaMixer(SSMDynamicInferenceMixin, MegatronModule):
+             self._A_neg_exp_cache_stale = True
+         elif self._A_neg_exp_cache_stale:
+             # CUDA graph replay bypasses the Python lazy-refresh path.
+-            self.refresh_cache()
++            # Guard: eval() runs during post-refit weight offload in colocated
++            # NeMo-RL, where A_log's storage is already freed; refreshing then
++            # reads freed memory (CUDA illegal access). Leave the cache stale —
++            # _get_decode_A_neg_exp refreshes lazily once weights are back.
++            if (
++                self.A_log.device.type == "cuda"
++                and self.A_log.untyped_storage().size() > 0
++                and self._A_neg_exp_cache.untyped_storage().size() > 0
++            ):
++                self.refresh_cache()
+         return super().train(mode)
+ 
+     def ssm_decode(
+-- 
+2.43.0
+

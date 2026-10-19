@@ -1180,12 +1180,51 @@ def _apply_vllm_flashinfer_trtllm_refit_buffer_runtime_patch(
     logger.info("Successfully patched vLLM FlashInfer TRTLLM MoE refit buffers.")
 
 
+def _maybe_install_nemo_audio_in_engine_core(args: Any, kwargs: Any) -> None:
+    """Install Bridge NeMo audio dispatch inside spawned EngineCore processes.
+
+    The async engine spawns EngineCore in a fresh process, where the parent
+    worker's install_nemo_audio() call does not apply; EngineCore runs the
+    multimodal processor/profiling path that constructs the sound tower, so a
+    nemo_transformer checkpoint crashes on Parakeet-only config fields there.
+    """
+    import os, traceback
+
+    def _trace(msg: str) -> None:
+        trace_path = os.environ.get("NRL_NEMO_AUDIO_TRACE")
+        if trace_path:
+            try:
+                with open(trace_path, "a") as fh:
+                    fh.write(f"[pid {os.getpid()}] {msg}\n")
+            except OSError:
+                pass
+
+    try:
+        vllm_config = kwargs.get("vllm_config")
+        if vllm_config is None:
+            for a in args:
+                if hasattr(a, "model_config"):
+                    vllm_config = a
+                    break
+        if vllm_config is None:
+            _trace(f"no vllm_config; args={[type(a).__name__ for a in args]} kwargs={list(kwargs)}")
+            return
+        model = vllm_config.model_config.model
+        from nemo_rl.models.generation.vllm.nemo_audio import install_nemo_audio
+
+        installed = install_nemo_audio(model)
+        _trace(f"install for {model}: {installed}")
+    except Exception as exc:  # non-audio checkpoints must be unaffected
+        _trace(f"install raised: {exc!r}\n{traceback.format_exc()}")
+
+
 def _run_engine_core_with_flashinfer_trtllm_refit_patch(
     *args: Any, **kwargs: Any
 ) -> Any:
     """Apply the refit patch inside EngineCore before model construction."""
     _apply_vllm_flashinfer_trtllm_refit_buffer_runtime_patch()
     _patch_vllm_flashinfer_trtllm_refit_from_collective_rpc()
+    _maybe_install_nemo_audio_in_engine_core(args, kwargs)
 
     # Import here because this function is also the multiprocessing target for
     # spawned EngineCore processes, where module import state is rebuilt.
@@ -1217,6 +1256,16 @@ def _ray_worker_initialize_with_flashinfer_trtllm_refit_patch(
 ) -> Any:
     """Apply the refit patch before RayExecutorV2 initializes a worker model."""
     _apply_vllm_flashinfer_trtllm_refit_buffer_runtime_patch()
+    # RayWorkerProc is a fresh Ray actor process: the EngineCore install does
+    # not reach it, and worker_cls construction happens after this point, so a
+    # nemo_transformer sound tower must be dispatched here as well.
+    _maybe_install_nemo_audio_in_engine_core(
+        (),
+        {
+            "vllm_config": getattr(self, "vllm_config", None)
+            or getattr(self, "_init_kwargs", {}).get("vllm_config")
+        },
+    )
 
     original_initialize_worker = getattr(
         type(self), G_FLASHINFER_TRTLLM_RAY_WORKER_ORIGINAL_ATTR, None

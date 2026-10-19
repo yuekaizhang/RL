@@ -1,0 +1,128 @@
+# Single-node (1n8g) smoke test: conversational tool-use pivot (TAU1) on
+# Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16.
+#
+# Model plumbing (parsers, mamba flags, parallelism) comes from grpo_nanov3.yaml
+# and the nemotron-omni VLM recipes (vlm_grpo-nemotron-omni-30ba3b-clevr-1n8g);
+# algorithm settings mirror grpo_qwen3_30ba3b_thinking_tau1.yaml (colocated sync
+# GRPO, leave-one-out baseline, clip 0.2/0.2, KL=0).
+# Wiring validation only: tiny batch, 3 steps, no checkpointing/W&B.
+
+defaults: "grpo_nanov3.yaml"
+
+grpo:
+  num_prompts_per_step: 8
+  num_generations_per_prompt: 8
+  max_num_steps: 3
+  max_num_epochs: 10
+  val_period: 1000
+  val_at_start: false
+  overlong_filtering: false
+  # KL penalty is 0, so reference-policy logprobs are never used.
+  skip_reference_policy_logprobs_calculation: true
+loss_fn:
+  # Plain GRPO per the tau recipe (the nanov3 base enables decoupled clip +
+  # IS corrections meant for its async setups).
+  ratio_clip_max: 0.2
+  use_on_policy_kl_approximation: false
+  use_importance_sampling_correction: false
+checkpointing:
+  enabled: false
+  metric_name: train:total_reward/mean
+policy:
+  model_name: nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16
+  tokenizer:
+    chat_template_kwargs:
+      # The nano-omni template treats undefined enable_thinking as false and
+      # would pre-close the think block; the Reasoning model must think.
+      enable_thinking: true
+  train_global_batch_size: 64
+  generation_batch_size: 16
+  logprob_chunk_size: 1024
+  # Pivot prompts: mean ~4.5k tokens, p99 ~8.7k; generations ~1-2k.
+  max_total_sequence_length: 16384
+  megatron_cfg:
+    # 1n8g layout from the clevr omni recipe: one TP8/EP8 replica, DP=1.
+    tensor_model_parallel_size: 8
+    pipeline_model_parallel_size: 1
+    context_parallel_size: 1
+    expert_model_parallel_size: 8
+    empty_unused_memory_level: 2
+    # Text-only pivot batches give the vision/sound towers zero gradients,
+    # tripping Megatron DDP's per-param grad accounting on the next
+    # zero_grad_buffer (param_and_grad_buffer.py:294 assert). Freeze them.
+    freeze_vision_model: true
+    freeze_vision_projection: true
+    freeze_sound_encoder: true
+    freeze_sound_projection: true
+    env_vars:
+      TORCH_CUDA_ARCH_LIST: '9.0'
+  generation:
+    # Multimodal special tokens the text-only tool-use rollouts must not emit.
+    bad_words:
+    - <image>
+    - <img>
+    - </img>
+    - <so_embedding>
+    - <so_start>
+    - <so_end>
+    vllm_cfg:
+      # Generation dominates step time (~80%). TP4 doubles DP instances (2 per
+      # node) and halves TP comms vs the clevr recipe's TP8; enforce_eager=false
+      # re-enables CUDA graphs, which matter a lot for mamba-hybrid decode. Both
+      # match the proven text-nanov3 recipe (compilation backend=eager inherits
+      # from the base). Weights at TP4 are ~15.5GB/GPU, well within the 0.5
+      # quota.
+      tensor_parallel_size: 4
+      enforce_eager: false
+      gpu_memory_utilization: 0.5
+      logprobs_mode: raw_logprobs
+      # The nanov3 base loads a nano_v3 parser plugin via a repo-relative path
+      # that ray workers cannot resolve (cwd differs). vLLM 0.25.1 ships an
+      # equivalent builtin; the plugin's only delta applies to
+      # enable_thinking=false, which this recipe never uses.
+      reasoning_parser_plugin: null
+      http_server_serving_chat_kwargs:
+        reasoning_parser: nemotron_v3
+        default_chat_template_kwargs:
+          enable_thinking: true
+    vllm_kwargs:
+      skip_mm_profiling: true
+      kernel_config:
+        enable_flashinfer_autotune: false
+        moe_backend: triton
+data:
+  max_input_seq_length: null
+  shuffle: true
+  num_workers: 1
+  use_multiple_dataloader: false
+  train:
+    data_path: datasets/conversational_tool_use_pivot/train.jsonl
+  validation:
+    data_path: datasets/conversational_tool_use_pivot/val.jsonl
+  default:
+    dataset_name: NemoGymDataset
+    env_name: nemo_gym
+    prompt_file: null
+    system_prompt_file: null
+    processor: nemo_gym_data_processor
+  _override_: true
+env:
+  should_use_nemo_gym: true
+  should_log_nemo_gym_responses: false
+  should_mask_flagged_samples: true
+  nemo_gym:
+    skip_venv_if_present: true
+    port_range_low: 5000
+    port_range_high: 5999
+    config_paths:
+    - responses_api_models/vllm_model/configs/vllm_model_for_training.yaml
+    - resources_servers/single_step_tool_use_with_argument_comparison/configs/single_step_tool_use_with_argument_comparison.yaml
+  _override_: true
+logger:
+  log_dir: logs
+  wandb_enabled: false
+  tensorboard_enabled: false
+  mlflow_enabled: false
+  monitor_gpus: false
+cluster:
+  num_nodes: 1

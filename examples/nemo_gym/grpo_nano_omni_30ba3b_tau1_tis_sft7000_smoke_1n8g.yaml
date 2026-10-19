@@ -1,0 +1,29 @@
+# 1n8g debug smoke for the sft7000 arm: 3 tiny steps with the TIS loss and the
+# clean chat template, starting from the STAGED tau_nano35 step-7000 checkpoint
+# (nemo_transformer RoPE audio encoder). Validates: Bridge HF import of the new
+# sound tower, vLLM native generation, one real GRPO update, and refit.
+
+defaults: "grpo_nano_omni_30ba3b_tau1_smoke_1n8g.yaml"
+
+grpo:
+  overlong_filtering: true
+  seq_logprob_error_threshold: 1.5
+loss_fn:
+  sequence_level_importance_ratios: false
+  token_level_loss: true
+  ratio_clip_max: 0.28
+  use_on_policy_kl_approximation: true
+  use_importance_sampling_correction: true
+  truncated_importance_sampling_type: tis
+  truncated_importance_sampling_ratio: 5.0
+policy:
+  model_name: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_nemorl/users/yuekaiz/pivot_rl/ckpts/sft7000_rl_hf
+  tokenizer:
+    name: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_nemorl/users/yuekaiz/pivot_rl/ckpts/sft7000_rl_hf
+  generation:
+    vllm_cfg:
+      http_server_serving_chat_kwargs:
+        chat_template: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_nemorl/users/yuekaiz/pivot_rl/RL-voicechat/examples/nemo_gym/nano_omni_chat_template_sysfix.jinja
+logger:
+  wandb_enabled: false
+  mlflow_enabled: false

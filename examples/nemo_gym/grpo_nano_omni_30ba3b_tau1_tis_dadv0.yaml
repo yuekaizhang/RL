@@ -1,0 +1,33 @@
+# TIS recipe x self-profiled dadv0 data x fixed chat-template rendering.
+#
+# Inherits the TIS ablation arm (token-level GRPO + TIS cap 5.0 + seq
+# threshold 1.5 + clip 0.28) and changes:
+#   - rendering: rollout prompts use the repo-hosted sysfix template, so the
+#     system/policy text is rendered as plain text instead of the Python
+#     list-repr the upstream nano template produced (the echo attractor seen
+#     in empty-output dumps). First arm trained on clean rendering.
+#   - data: nano self-profiled reward_mean <= 0.6 INCLUDING all-zero rows
+#     (dadv0, 66,522 rows) — same data as the DAPO arm but with plain
+#     sampling (no dynamic sampling): all-zero rows idle until solvable.
+#     Paths supplied by the submit script via EXTRA_OVERRIDES_STR.
+#   - checkpointing: keep_top_k 7.
+#
+# NOTE: checkpoints from this arm should be EVALUATED with the same clean
+# template (serve with --chat-template <sysfix.jinja> or patch the converted
+# dir) — clean-trained models must not be scored under the dirty rendering.
+
+defaults: "grpo_nano_omni_30ba3b_tau1_tis.yaml"
+
+checkpointing:
+  keep_top_k: 7
+policy:
+  generation:
+    vllm_cfg:
+      http_server_serving_chat_kwargs:
+        chat_template: /lustre/fsw/portfolios/coreai/users/yuekaiz/pivot_rl/RL/examples/nemo_gym/nano_omni_chat_template_sysfix.jinja
+logger:
+  wandb:
+    name: nano-omni-30b-tau1-tis-dadv0
+  mlflow:
+    experiment_name: nano-omni-30b-tau1-tis-dadv0
+    run_name: nano-omni-30b-tau1-tis-dadv0
