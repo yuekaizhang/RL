@@ -38,6 +38,21 @@ def test_supported(config):
     validate_single_controller_config(MasterConfig(**config))
 
 
+@pytest.mark.parametrize("expert_parallel_size", [1, 16])
+def test_full_batch_lookahead_one_supported(config, expert_parallel_size):
+    config["policy"]["automodel_cfg"]["expert_parallel_size"] = expert_parallel_size
+    if expert_parallel_size == 16:
+        config["cluster"].update(num_nodes=3, gpus_per_node=8)
+        config["policy"]["generation"]["colocated"]["resources"]["gpus_per_node"] = 8
+    prompts = config["grpo"]["num_prompts_per_step"]
+    config["async_rl"]["sampler"]["max_lookahead_versions"] = 1
+    config["async_rl"]["max_inflight_prompts"] = 2 * prompts
+    config["async_rl"]["max_buffered_rollouts"] = 2 * prompts
+    config["loss_fn"]["use_importance_sampling_correction"] = True
+    config["loss_fn"]["force_on_policy_ratio"] = False
+    validate_single_controller_config(MasterConfig(**config))
+
+
 @pytest.mark.parametrize("expert_parallel_size", [2, 16])
 def test_expert_parallel_full_batch_supported(config, expert_parallel_size):
     # Sixteen training GPUs and eight rollout GPUs accommodate both EP sizes.
@@ -81,7 +96,7 @@ def test_full_batch_regression_recipe(recipe):
 @pytest.mark.parametrize(
     "path,value",
     [
-        ("async_rl.sampler.max_lookahead_versions", 1),
+        ("async_rl.sampler.max_lookahead_versions", 2),
         ("async_rl.sampler.name", "ready_first"),
         ("async_rl.min_groups_for_streaming_train", 1),
         ("policy.dynamic_batching.enabled", True),
