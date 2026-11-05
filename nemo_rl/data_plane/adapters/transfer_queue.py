@@ -1298,6 +1298,17 @@ class TQDataPlaneClient(DataPlaneClient):
         # ``field_name_mapping`` is append-only (never deleted, and our
         # ``clear_samples`` zeroes rows without popping the partition).
         already = self._warmed_fields.setdefault(partition_id, set())
+        if any(field not in already for field in fields):
+            self._mark_data_operation_started()
+            # A new client (including the restoring driver) has an empty local
+            # warmup cache, but the controller may already own typed live rows.
+            # Writing float placeholders over those fields fails TQ's dtype
+            # check. Ask the pinned TQ metadata API which fields already exist;
+            # only genuinely new fields need the placeholder registration.
+            client = tq.get_client()
+            existing = client._run_coroutine(client._get_partition_meta(partition_id))
+            if existing is not None:
+                already.update(existing.field_names)
         fields = [f for f in fields if f not in already]
         if not fields:
             return
