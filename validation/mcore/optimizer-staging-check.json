@@ -1,0 +1,17 @@
+{
+  "status": "passed",
+  "scope": "TE FusedAdam portable state + load + next update; not full EP16 resume",
+  "portable_state_and_next_update": "bitwise_equal",
+  "checks": [
+    {
+      "cpu_staging": false,
+      "patched": 0,
+      "extra_peak_bytes": 234881024
+    },
+    {
+      "cpu_staging": true,
+      "patched": 1,
+      "extra_peak_bytes": 100663296
+    }
+  ]
+}

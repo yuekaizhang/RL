@@ -117,3 +117,17 @@ runs complete. Cron service and queue delivery were tested; local evidence is
 in `results/cron-heartbeat.txt` and `results/watch-10min*.log`. The conversation
 checks Slurm and actual logs, handles failures, and removes this schedule when
 both cases finish. The held AutoModel 900-step jobs must remain held.
+
+The first chunk512 retry also failed before any new update: loading compressed
+Adam's portable FP32 state exhausted GPU memory in `FusedAdam.load_state_dict`.
+Both cases therefore enable Bridge's existing
+`checkpoint.stage_precision_aware_optimizer_state_on_cpu` through a new
+NeMo-RL configuration pass-through. This changes checkpoint staging devices,
+not the optimizer's training precision or saved values.
+`check_optimizer_staging.py` verified bitwise-identical portable state and
+next optimizer updates using the image's real FusedAdam; extra peak memory
+fell from 224 to 96 MiB in the isolated test. This is not proof that the full
+EP16 resume fits; inspect the new jobs before claiming recovery.
+Latest retry IDs are in `slurm/submitted-cpu-staging.tsv`; all retries remain
+in `submitted.tsv`. The submission helper checks that no prior MCore job
+remains queued before creating another chain.

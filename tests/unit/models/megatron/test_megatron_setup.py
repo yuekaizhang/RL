@@ -3230,6 +3230,20 @@ class TestCreateCheckpointConfig:
         assert checkpoint_config.ckpt_fully_parallel_load_process_group == "ep_dp"
         assert checkpoint_config.ckpt_fully_parallel_load_exchange_algo == "broadcast"
 
+    @pytest.mark.parametrize("enabled", [False, True])
+    def test_precision_aware_checkpoint_cpu_staging(self, tmp_path, enabled):
+        """Preserve the requested Bridge staging knob on full optimizer resume."""
+        from nemo_rl.models.megatron.setup import _create_checkpoint_config
+
+        config = _create_checkpoint_config(
+            str(tmp_path / "pretrained"),
+            str(tmp_path / "weights"),
+            str(tmp_path / "optimizer"),
+            ckpt_cfg={"stage_precision_aware_optimizer_state_on_cpu": enabled},
+        )
+        assert config.load_optim is True
+        assert config.stage_precision_aware_optimizer_state_on_cpu is enabled
+
     def test_cold_start_save_falls_back_to_pretrained(self, tmp_path):
         """With async_save and no weights_path (cold start), save falls back to pretrained."""
         from nemo_rl.models.megatron.setup import _create_checkpoint_config

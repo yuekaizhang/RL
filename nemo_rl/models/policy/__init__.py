@@ -379,6 +379,8 @@ class MegatronConfigDisabled(TypedDict):
 class MegatronCheckpointConfig(TypedDict, total=False):
     """Checkpoint knobs passed through to Megatron Bridge CheckpointConfig."""
 
+    # Keep portable FP32 expansions of compressed Adam state off the GPU.
+    stage_precision_aware_optimizer_state_on_cpu: bool
     # Offload disk writes to a persistent background worker so save_checkpoint
     # returns after D2H staging.
     async_save: bool

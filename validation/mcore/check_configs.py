@@ -73,6 +73,7 @@ def main():
         "generation_tp": policy["generation"]["vllm_cfg"]["tensor_parallel_size"],
         "logprob_chunk_size": policy["logprob_chunk_size"],
         "allocator_env": policy["megatron_cfg"]["env_vars"],
+        "checkpoint": policy["megatron_cfg"]["checkpoint"],
         "optimizer": policy["megatron_cfg"]["optimizer"],
         "scheduler": policy["megatron_cfg"]["scheduler"],
         "router": {

@@ -28,6 +28,11 @@
   "allocator_env": {
     "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
   },
+  "checkpoint": {
+    "async_save": true,
+    "ckpt_assume_constant_structure": true,
+    "stage_precision_aware_optimizer_state_on_cpu": true
+  },
   "optimizer": {
     "optimizer": "adam",
     "lr": 1e-06,

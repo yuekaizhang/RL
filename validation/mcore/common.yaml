@@ -22,6 +22,9 @@ policy:
     defer_fp32_logits: true
     distributed_data_parallel_config:
       grad_reduce_in_fp32: true
+    checkpoint:
+      # Portable FP32 Adam state otherwise exceeds GPU memory during resume.
+      stage_precision_aware_optimizer_state_on_cpu: true
     env_vars:
       PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
     # AutoModel Qwen3.5 trains the gate, uses the input dtype for its linear

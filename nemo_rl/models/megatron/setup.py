@@ -2128,6 +2128,7 @@ def _create_checkpoint_config(
     # — no call-site default — so a config that omits the block keeps Bridge's
     # default (synchronous save).
     _optional_ckpt_fields = (
+        "stage_precision_aware_optimizer_state_on_cpu",
         "async_save",
         "ckpt_assume_constant_structure",
         "ckpt_fully_parallel_save_process_group",
