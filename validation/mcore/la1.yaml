@@ -1,0 +1,15 @@
+defaults: common.yaml
+policy:
+  megatron_cfg:
+    freeze_vision_encoder: true
+    freeze_vision_projector: true
+async_rl:
+  sampler:
+    max_lookahead_versions: 1
+checkpointing:
+  checkpoint_dir: /lustre/fsw/portfolios/coreai/users/yuekaiz/single_controller/RL-pr4963/validation/mcore/results/yuekaiz-mcore-la1-300/checkpoints
+logger:
+  log_dir: /lustre/fsw/portfolios/coreai/users/yuekaiz/single_controller/RL-pr4963/validation/mcore/results/yuekaiz-mcore-la1-300/logs
+  wandb:
+    id: yuekaiz4963mc1s42
+    name: yuekaiz-qwen35-35ba3b-mcore-ep16-fullbatch-la1-s42

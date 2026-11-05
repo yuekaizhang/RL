@@ -1,0 +1,107 @@
+{
+  "status": "passed",
+  "target_steps": 300,
+  "only_case_differences": [
+    "lookahead",
+    "checkpoint/log directory",
+    "W&B id/name"
+  ],
+  "model": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_nemorl/users/shuangy/models/Qwen/Qwen3.5-35B-A3B-Base",
+  "cluster": {
+    "gpus_per_node": 8,
+    "num_nodes": 3,
+    "master_port_range_low": 1400,
+    "master_port_range_high": 1999,
+    "segment_size": null
+  },
+  "global_batch": 32,
+  "prompts": 8,
+  "responses": 4,
+  "train_parallelism": {
+    "tensor_model_parallel_size": 1,
+    "context_parallel_size": 1,
+    "pipeline_model_parallel_size": 1,
+    "expert_model_parallel_size": 16
+  },
+  "generation_tp": 8,
+  "optimizer": {
+    "optimizer": "adam",
+    "lr": 1e-06,
+    "min_lr": 1e-06,
+    "weight_decay": 0.1,
+    "bf16": true,
+    "fp16": false,
+    "params_dtype": "float32",
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.999,
+    "adam_eps": 1e-08,
+    "sgd_momentum": 0.9,
+    "use_distributed_optimizer": true,
+    "use_precision_aware_optimizer": true,
+    "clip_grad": 1.0,
+    "optimizer_cpu_offload": false,
+    "optimizer_offload_fraction": 0.0,
+    "overlap_cpu_optimizer_d2h_h2d": false,
+    "main_grads_dtype": "float32",
+    "main_params_dtype": "float32",
+    "exp_avg_dtype": "bfloat16",
+    "exp_avg_sq_dtype": "bfloat16",
+    "store_param_remainders": true
+  },
+  "scheduler": {
+    "start_weight_decay": 0.1,
+    "end_weight_decay": 0.1,
+    "weight_decay_incr_style": "constant",
+    "lr_decay_style": "constant",
+    "lr_decay_iters": 300,
+    "lr_warmup_iters": 10,
+    "lr_warmup_init": 1e-14
+  },
+  "router": {
+    "freeze_moe_router": false,
+    "moe_router_dtype": null,
+    "moe_router_load_balancing_type": "none",
+    "model_overrides": {
+      "moe_router_pre_softmax": false,
+      "moe_aux_loss_coeff": 0.0
+    }
+  },
+  "loss": {
+    "reference_policy_kl_penalty": 0.0,
+    "reference_policy_kl_type": "k3",
+    "kl_input_clamp_value": 20.0,
+    "kl_output_clamp_value": 10.0,
+    "ratio_clip_min": 0.2,
+    "ratio_clip_max": 0.28,
+    "ratio_clip_c": 10,
+    "use_on_policy_kl_approximation": false,
+    "use_importance_sampling_correction": true,
+    "truncated_importance_sampling_type": "tis",
+    "truncated_importance_sampling_ratio": 2,
+    "truncated_importance_sampling_ratio_min": null,
+    "truncated_importance_sampling_adaptive_target_entropy": 0.3,
+    "truncated_importance_sampling_adaptive_k_step": 0.25,
+    "truncated_importance_sampling_adaptive_k_max": 1.0,
+    "truncated_importance_sampling_adaptive_outer_bound": 50.0,
+    "sequence_level_importance_ratios": false,
+    "token_level_loss": true,
+    "force_on_policy_ratio": false,
+    "seq_logprob_error_in_loss": false,
+    "use_kl_in_reward": false,
+    "use_cispo": false,
+    "disable_ppo_ratio": false,
+    "positive_example_nll_weight": 0.0,
+    "metrics_level": "full",
+    "enable_torch_compile": false
+  },
+  "async_rl": {
+    "sampler": {
+      "name": "in_order",
+      "max_lookahead_versions": 0
+    },
+    "recompute_kv_cache_after_weight_updates": true,
+    "min_groups_for_streaming_train": 8,
+    "max_inflight_prompts": 16,
+    "max_buffered_rollouts": 16
+  }
+}

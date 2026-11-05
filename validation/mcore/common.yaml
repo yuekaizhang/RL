@@ -1,0 +1,69 @@
+# Match the existing AutoModel experiment's learning recipe; use MCore policy.
+defaults: ../configs/qwen35_ep16_la1.yaml
+grpo:
+  max_num_steps: 300
+policy:
+  automodel_cfg:
+    enabled: false
+  megatron_cfg:
+    enabled: true
+    tensor_model_parallel_size: 1
+    pipeline_model_parallel_size: 1
+    context_parallel_size: 1
+    expert_tensor_parallel_size: 1
+    expert_model_parallel_size: 16
+    sequence_parallel: false
+    activation_checkpointing: true
+    apply_rope_fusion: false
+    # Required by MCore when the inherited logprob_chunk_size=4096 is enabled.
+    defer_fp32_logits: true
+    distributed_data_parallel_config:
+      grad_reduce_in_fp32: true
+    # AutoModel Qwen3.5 trains the gate, uses the input dtype for its linear
+    # projection, and computes softmax in FP32. Its effective HF override
+    # disables the router auxiliary loss and MTP.
+    freeze_moe_router: false
+    moe_router_dtype: null
+    moe_router_load_balancing_type: none
+    moe_router_bias_update_rate: 0.0
+    model_overrides:
+      # Top-k logits -> softmax has the same normalized weights as AutoModel's
+      # full softmax -> top-k -> renormalize. MCore pre-softmax omits renormalization.
+      moe_router_pre_softmax: false
+      moe_aux_loss_coeff: 0.0
+    optimizer:
+      lr: 1.0e-6
+      min_lr: 1.0e-6
+      weight_decay: 0.1
+      adam_beta1: 0.9
+      adam_beta2: 0.999
+      adam_eps: 1.0e-8
+      clip_grad: 1.0
+      use_precision_aware_optimizer: true
+      main_grads_dtype: float32
+      main_params_dtype: float32
+      exp_avg_dtype: bfloat16
+      exp_avg_sq_dtype: bfloat16
+      store_param_remainders: true
+    scheduler:
+      lr_warmup_iters: 10
+      lr_warmup_init: 1.0e-14
+      lr_decay_style: constant
+      lr_decay_iters: 300
+      start_weight_decay: 0.1
+      end_weight_decay: 0.1
+      weight_decay_incr_style: constant
+async_rl:
+  min_groups_for_streaming_train: 8
+  max_inflight_prompts: 16
+  max_buffered_rollouts: 16
+checkpointing:
+  save_period: 10
+  keep_top_k: 1
+  checkpoint_must_save_by: 00:03:45:00
+logger:
+  wandb:
+    entity: yuekaiz
+    project: nemo-rl-automodel-sc
+    group: yuekaiz-pr4963-mcore-kl
+    resume: allow

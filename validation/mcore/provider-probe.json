@@ -1,0 +1,20 @@
+{
+  "status": "passed",
+  "bridge_source": "/lustre/fsw/portfolios/coreai/users/yuekaiz/single_controller/RL-pr4963/3rdparty/Megatron-Bridge-workspace/Megatron-Bridge/src/megatron/bridge/__init__.py",
+  "mcore_source": "/lustre/fsw/portfolios/coreai/users/yuekaiz/single_controller/RL-pr4963/3rdparty/Megatron-Bridge-workspace/Megatron-Bridge/3rdparty/Megatron-LM/megatron/core/__init__.py",
+  "provider": "Qwen35VLMoEModelProvider",
+  "fields": {
+    "num_layers": "40",
+    "hidden_size": "2048",
+    "num_moe_experts": "256",
+    "moe_router_topk": "8",
+    "expert_model_parallel_size": "16",
+    "tensor_model_parallel_size": "1",
+    "context_parallel_size": "1",
+    "freeze_vision_model": "True",
+    "freeze_vision_projection": "True",
+    "moe_router_dtype": "None",
+    "moe_router_pre_softmax": "False",
+    "moe_aux_loss_coeff": "0.0"
+  }
+}
