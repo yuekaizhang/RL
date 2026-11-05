@@ -24,6 +24,10 @@
     "expert_model_parallel_size": 16
   },
   "generation_tp": 8,
+  "logprob_chunk_size": 512,
+  "allocator_env": {
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
   "optimizer": {
     "optimizer": "adam",
     "lr": 1e-06,

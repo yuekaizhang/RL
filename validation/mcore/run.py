@@ -12,6 +12,7 @@ from nemo_rl.algorithms.single_controller_utils.config import (
     validate_single_controller_config,
 )
 from nemo_rl.utils.config import load_config, register_omegaconf_resolvers
+from nemo_rl.utils.checkpoint import CheckpointManager
 
 assert os.environ["USER"] == "root" and os.environ.get("SLURM_JOB_ID")
 lag = int(os.environ["SC_MCORE_LOOKAHEAD"])
@@ -31,7 +32,10 @@ if saved:
     state = json.loads(latest.read_text())
     step = state["current_step"]
     assert state["trainer_version"] == step
-    assert (latest.parent / "policy/optimizer").exists()
+    # MCore embeds optimizer state in the distributed weights checkpoint.
+    # The returned optimizer path is a loader flag, not a separate directory.
+    weights_path, optimizer_path = CheckpointManager.get_resume_paths(latest.parent)
+    assert weights_path is not None and optimizer_path is not None
     assert (latest.parent / "data_plane").exists()
 if step >= 300:
     print(f"MCore LA{lag} already completed {step}; skipping")
@@ -43,6 +47,7 @@ manifest = {
     "slurm_job": os.environ["SLURM_JOB_ID"],
     "wandb_id": config["logger"]["wandb"]["id"],
     "config": path,
+    "logprob_chunk_size": config["policy"]["logprob_chunk_size"],
 }
 output = Path("validation/mcore/results")
 output.mkdir(exist_ok=True, parents=True)

@@ -17,6 +17,30 @@ for line in (root / "slurm/submitted.tsv").read_text().splitlines():
     lag, _, job = line.split("\t")
     jobs[lag].append(job)
 last_plot = {"0": 0, "1": 0}
+
+
+def notify_conversation(reason):
+    """Wake the original user-authorized conversation when monitoring ends."""
+    try:
+        notice = subprocess.run(
+            ["bash", "validation/mcore/watch_10min.sh"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            timeout=75,
+        )
+        print(
+            "CONVERSATION_NOTIFICATION",
+            reason,
+            notice.returncode,
+            notice.stdout.strip(),
+            notice.stderr.strip(),
+            flush=True,
+        )
+    except Exception as error:
+        print("CONVERSATION_NOTIFICATION_FAILED", reason, str(error), flush=True)
+
+
 while True:
     try:
         queue = subprocess.run(
@@ -204,6 +228,7 @@ while True:
                         }
                     break
         if all(complete) or result["bad"]:
+            notify_conversation("completed" if all(complete) else "invalid_metrics")
             break
         if not states:
             accounting = subprocess.run(
@@ -222,6 +247,7 @@ while True:
             )
             (root / "results/final-accounting.txt").write_text(accounting.stdout)
             print("ALLOCATIONS_ENDED_BEFORE_TARGET", accounting.stdout, flush=True)
+            notify_conversation("allocations_ended_before_target")
             break
     except Exception as error:
         print(type(error).__name__, str(error), flush=True)

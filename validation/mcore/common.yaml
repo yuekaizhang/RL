@@ -3,6 +3,9 @@ defaults: ../configs/qwen35_ep16_la1.yaml
 grpo:
   max_num_steps: 300
 policy:
+  # The 4096-token logprob backward chunk OOMed at step12 on both cases.
+  # Chunking changes workspace size, not batch size or the tokenwise objective.
+  logprob_chunk_size: 512
   automodel_cfg:
     enabled: false
   megatron_cfg:
@@ -19,6 +22,8 @@ policy:
     defer_fp32_logits: true
     distributed_data_parallel_config:
       grad_reduce_in_fp32: true
+    env_vars:
+      PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
     # AutoModel Qwen3.5 trains the gate, uses the input dtype for its linear
     # projection, and computes softmax in FP32. Its effective HF override
     # disables the router auxiliary loss and MTP.

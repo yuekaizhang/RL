@@ -85,3 +85,35 @@ growth on both backends supports an effect of stale-policy sampling; growth
 isolated to one backend warrants a fixed-token backend/refit investigation.
 Neither outcome alone establishes a bug. Check response length, reward, loss,
 entropy, sampling corrections and throughput alongside KL.
+
+## OOM recovery and active monitoring
+
+Both original jobs reached step 11 and failed in step 12 while allocating a
+4.26 GiB one-hot workspace in chunked logprob backward. Checkpoint 10 is the
+durable restart point. Both cases now use `policy.logprob_chunk_size=512`
+instead of 4096 and `expandable_segments:True`; batch size, sequence length,
+parallelism, optimizer and target 300 are unchanged. Preserve the original
+logs and annotate the execution change when comparing step time.
+
+The GPU test `check_logprob_chunks.py` compares forward and backward results
+using both chunk sizes. At sequence length 4096 and vocabulary 248320, maximum
+logprob/gradient differences were 9.54e-7/1.19e-7; peak allocated memory for
+this isolated computation decreased from 26.52 to 6.63 GiB. This is a workspace
+measurement, not the complete model's memory footprint. See the local report
+`results/logprob-chunk-check.json`.
+
+MCore embeds optimizer state under its distributed weights checkpoint. The
+resume launcher uses `CheckpointManager.get_resume_paths` to detect it rather
+than requiring AutoModel's separate optimizer directory. Recovery jobs are
+recorded in `slurm/submitted-chunk512.tsv` and appended to `submitted.tsv` so
+plots retain steps from both allocations, using the latest record on retries.
+
+The user requested checks every ten minutes. A user crontab entry invokes
+`watch_10min.sh`, which queues a check in the original Codex conversation and
+resumes it via the local daemon. The conversation target is stored only in
+local `results/watch-target.json`. The minute-level metric monitor also invokes
+this notifier when allocations end prematurely, metrics are invalid, or both
+runs complete. Cron service and queue delivery were tested; local evidence is
+in `results/cron-heartbeat.txt` and `results/watch-10min*.log`. The conversation
+checks Slurm and actual logs, handles failures, and removes this schedule when
+both cases finish. The held AutoModel 900-step jobs must remain held.

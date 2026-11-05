@@ -1,0 +1,57 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "sequence_length": 1537,
+      "vocab_size": 4096,
+      "logprob_max_abs_error": 0.0,
+      "gradient_max_abs_error": 0.0,
+      "logprob_tolerance": {
+        "rtol": 1e-06,
+        "atol": 2e-06
+      },
+      "gradient_tolerance": {
+        "rtol": 0.01,
+        "atol": 2e-06
+      },
+      "memory": [
+        {
+          "chunk": 4096,
+          "peak_allocated_bytes": 176326144,
+          "workspace_above_input_bytes": 163715584
+        },
+        {
+          "chunk": 512,
+          "peak_allocated_bytes": 75563008,
+          "workspace_above_input_bytes": 62952448
+        }
+      ]
+    },
+    {
+      "sequence_length": 4096,
+      "vocab_size": 248320,
+      "logprob_max_abs_error": 9.5367431640625e-07,
+      "gradient_max_abs_error": 1.1920928955078125e-07,
+      "logprob_tolerance": {
+        "rtol": 1e-06,
+        "atol": 2e-06
+      },
+      "gradient_tolerance": {
+        "rtol": 0.01,
+        "atol": 2e-06
+      },
+      "memory": [
+        {
+          "chunk": 4096,
+          "peak_allocated_bytes": 28479448064,
+          "workspace_above_input_bytes": 26445161472
+        },
+        {
+          "chunk": 512,
+          "peak_allocated_bytes": 7122048512,
+          "workspace_above_input_bytes": 5087761920
+        }
+      ]
+    }
+  ]
+}
