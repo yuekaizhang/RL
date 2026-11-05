@@ -1,0 +1,161 @@
+{
+  "status": "passed",
+  "unit_tests": {
+    "targeted.xml": {
+      "tests": "548",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "18.678"
+    },
+    "eight-prompt.xml": {
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "5.837"
+    },
+    "tq-lifecycle.xml": {
+      "tests": "28",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "11.069"
+    }
+  },
+  "unit_total_passed": 580,
+  "real_run": {
+    "status": "passed",
+    "steps": 10,
+    "samples_consumed_once": 320,
+    "admitted_groups_due_and_consumed_once": 80,
+    "ready_groups_with_verified_weight_interval": 64,
+    "groups_admitted": 96,
+    "max_buffered_groups": 16,
+    "future_rpc_train_overlap_count": 26,
+    "overlap_examples": [
+      {
+        "step": 1,
+        "future_group": "4b4e7c80-b117-403c-b075-6054a07ebe55",
+        "overlap_ms": 736.446258
+      },
+      {
+        "step": 1,
+        "future_group": "23e9d105-af2f-487d-8bc9-b3e90b3f16e3",
+        "overlap_ms": 1268.815991
+      },
+      {
+        "step": 1,
+        "future_group": "df4aed86-80ad-4224-9aa4-1df1d4cbcb73",
+        "overlap_ms": 1805.475497
+      },
+      {
+        "step": 1,
+        "future_group": "93cebb11-b521-48c4-b274-45b08c54c548",
+        "overlap_ms": 3387.766402
+      },
+      {
+        "step": 1,
+        "future_group": "352baa90-f111-4b64-aabf-686f49592d57",
+        "overlap_ms": 3387.766402
+      }
+    ],
+    "generation_gpu_executions_inside_training": 406,
+    "generation_gpu_overlap_examples": [
+      {
+        "step": 8,
+        "cuda_ms": 7.270080089569092,
+        "scheduled_tokens": 7,
+        "start_ns": 1072637841654392,
+        "end_ns": 1072637848961239
+      },
+      {
+        "step": 8,
+        "cuda_ms": 7.367775917053223,
+        "scheduled_tokens": 7,
+        "start_ns": 1072637850379263,
+        "end_ns": 1072637857784146
+      },
+      {
+        "step": 8,
+        "cuda_ms": 7.2718400955200195,
+        "scheduled_tokens": 7,
+        "start_ns": 1072637859153671,
+        "end_ns": 1072637866463287
+      },
+      {
+        "step": 8,
+        "cuda_ms": 7.3970561027526855,
+        "scheduled_tokens": 7,
+        "start_ns": 1072637867854658,
+        "end_ns": 1072637875290140
+      },
+      {
+        "step": 8,
+        "cuda_ms": 7.363039970397949,
+        "scheduled_tokens": 7,
+        "start_ns": 1072637876713852,
+        "end_ns": 1072637884114926
+      }
+    ],
+    "restore_step": 1,
+    "ready_groups_at_cut": [
+      "accfd8de-7be5-4cd8-8862-2a29d8e9f24c",
+      "f3e71f6a-ab7f-440f-ba50-26855a51afb4",
+      "7a95bb59-f7ed-4328-ac83-9b712d57b66b",
+      "2c773f07-1672-46e7-bffe-e45e397b6aa6",
+      "2c2e37a8-2d5d-451c-865a-b407c28da468",
+      "02370c5e-0a3a-4d9b-aac5-a221c7b9c0d1",
+      "6ac752df-fa29-49e3-9685-89a0887dbb38",
+      "48581c24-e6e1-4884-8cce-79c632d30616"
+    ],
+    "pending_rpc_groups_at_cut": [
+      "23e9d105-af2f-487d-8bc9-b3e90b3f16e3",
+      "352baa90-f111-4b64-aabf-686f49592d57",
+      "4b4e7c80-b117-403c-b075-6054a07ebe55",
+      "7ce4e886-5f81-4af1-93fd-4c95323760c7",
+      "93cebb11-b521-48c4-b274-45b08c54c548",
+      "c60c392b-c1c4-4d6f-880d-63e30319735f",
+      "cf88aa78-4779-4873-acf5-edc27f746d84",
+      "df4aed86-80ad-4224-9aa4-1df1d4cbcb73"
+    ],
+    "restored_groups_consumed": [
+      "02370c5e-0a3a-4d9b-aac5-a221c7b9c0d1",
+      "23e9d105-af2f-487d-8bc9-b3e90b3f16e3",
+      "2c2e37a8-2d5d-451c-865a-b407c28da468",
+      "2c773f07-1672-46e7-bffe-e45e397b6aa6",
+      "352baa90-f111-4b64-aabf-686f49592d57",
+      "48581c24-e6e1-4884-8cce-79c632d30616",
+      "4b4e7c80-b117-403c-b075-6054a07ebe55",
+      "6ac752df-fa29-49e3-9685-89a0887dbb38",
+      "7a95bb59-f7ed-4328-ac83-9b712d57b66b",
+      "7ce4e886-5f81-4af1-93fd-4c95323760c7",
+      "93cebb11-b521-48c4-b274-45b08c54c548",
+      "accfd8de-7be5-4cd8-8862-2a29d8e9f24c",
+      "c60c392b-c1c4-4d6f-880d-63e30319735f",
+      "cf88aa78-4779-4873-acf5-edc27f746d84",
+      "df4aed86-80ad-4224-9aa4-1df1d4cbcb73",
+      "f3e71f6a-ab7f-440f-ba50-26855a51afb4"
+    ],
+    "loss_microbatches": 320,
+    "max_current_vs_recomputed_policy_logprob_gap": 0.0,
+    "resident_weight_check": "separate resident-report.json"
+  },
+  "resident_weights": {
+    "status": "passed",
+    "version": 10,
+    "parameter_slices_compared_exactly": 58,
+    "values_compared": 14848,
+    "values_changed_since_previous_refit": 3,
+    "refit_interval_ns": [
+      1072673897605463,
+      1072674007011555
+    ]
+  },
+  "main_convergence": {
+    "completed_steps": 600,
+    "baselines_steps": 500,
+    "extension_to900": "all three jobs held by user on 2026-11-04; never started"
+  },
+  "scope": "real tensor/GPU audit uses Qwen2.5-1.5B TP1; EP16 Qwen3.5 convergence is separate"
+}

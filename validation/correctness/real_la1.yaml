@@ -1,0 +1,27 @@
+defaults: ../configs/smoke_la1.yaml
+grpo:
+  max_num_steps: 6
+  num_prompts_per_step: 8
+policy:
+  max_total_sequence_length: 2560
+  generation:
+    max_new_tokens: 2048
+async_rl:
+  min_groups_for_streaming_train: 8
+  max_inflight_prompts: 16
+  max_buffered_rollouts: 16
+  log_full_train_data: true
+  diagnostics: true
+loss_fn:
+  enable_torch_compile: false
+  truncated_importance_sampling_ratio: 2
+  truncated_importance_sampling_type: tis
+  truncated_importance_sampling_ratio_min: null
+checkpointing:
+  checkpoint_dir: /lustre/fsw/portfolios/coreai/users/yuekaiz/single_controller/RL-pr4963/validation/correctness/real/ckpts
+  save_period: 1
+  keep_top_k: 1
+  checkpoint_must_save_by: 00:00:00:01
+logger:
+  log_dir: /lustre/fsw/portfolios/coreai/users/yuekaiz/single_controller/RL-pr4963/validation/correctness/real/logs
+  wandb_enabled: false
