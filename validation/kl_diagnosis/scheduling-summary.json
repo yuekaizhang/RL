@@ -313,6 +313,78 @@
     }
   ],
   "fp32_a_log_wire_verified": true,
+  "per_step": {
+    "600": {
+      "train_eval": {
+        "tokens": 26114,
+        "mean_k3": 0.0,
+        "reverse_mean_k3": 0.0,
+        "rms_logprob_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      },
+      "generation_policy": {
+        "tokens": 26114,
+        "mean_k3": 0.0020506192759113563,
+        "reverse_mean_k3": 0.002154293061400519,
+        "rms_logprob_delta": 0.06434115815455127,
+        "max_abs_delta": 1.3462975025177002,
+        "nonidentical_fraction": 0.8863444895458374
+      },
+      "drift": {
+        "tokens": 26114,
+        "mean_k3": 0.0022078200587448576,
+        "reverse_mean_k3": 0.0021921356844252595,
+        "rms_logprob_delta": 0.06582553885471712,
+        "max_abs_delta": 1.2344131469726562,
+        "nonidentical_fraction": 0.8763498506548212
+      }
+    },
+    "601": {
+      "train_eval": {
+        "tokens": 26477,
+        "mean_k3": 0.0,
+        "reverse_mean_k3": 0.0,
+        "rms_logprob_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      },
+      "generation_policy": {
+        "tokens": 26477,
+        "mean_k3": 0.002025913448913016,
+        "reverse_mean_k3": 0.0021472545500570684,
+        "rms_logprob_delta": 0.0639251773731791,
+        "max_abs_delta": 1.342578411102295,
+        "nonidentical_fraction": 0.8744570759527137
+      },
+      "drift": {
+        "tokens": 26477,
+        "mean_k3": 0.0028245480845560202,
+        "reverse_mean_k3": 0.004237211101937244,
+        "rms_logprob_delta": 0.07776894504095662,
+        "max_abs_delta": 3.365217447280884,
+        "nonidentical_fraction": 0.863239793027911
+      }
+    }
+  },
+  "admission": [
+    {
+      "trainer_version": 600,
+      "rollout_versions": [
+        600
+      ],
+      "lag": 0,
+      "unique_samples": 32
+    },
+    {
+      "trainer_version": 601,
+      "rollout_versions": [
+        600
+      ],
+      "lag": 1,
+      "unique_samples": 32
+    }
+  ],
   "pass_order": [
     "concurrent32",
     "serial1",
@@ -351,6 +423,9 @@
       "rank": 0,
       "model_training": false,
       "active_dropout_modules": [],
+      "batch_invariance": {
+        "recorded": false
+      },
       "ssm_cache_dtypes": [
         "torch.float32"
       ],
@@ -362,6 +437,9 @@
       "rank": 1,
       "model_training": false,
       "active_dropout_modules": [],
+      "batch_invariance": {
+        "recorded": false
+      },
       "ssm_cache_dtypes": [
         "torch.float32"
       ],
@@ -373,6 +451,9 @@
       "rank": 2,
       "model_training": false,
       "active_dropout_modules": [],
+      "batch_invariance": {
+        "recorded": false
+      },
       "ssm_cache_dtypes": [
         "torch.float32"
       ],
@@ -384,6 +465,9 @@
       "rank": 3,
       "model_training": false,
       "active_dropout_modules": [],
+      "batch_invariance": {
+        "recorded": false
+      },
       "ssm_cache_dtypes": [
         "torch.float32"
       ],
@@ -395,6 +479,9 @@
       "rank": 4,
       "model_training": false,
       "active_dropout_modules": [],
+      "batch_invariance": {
+        "recorded": false
+      },
       "ssm_cache_dtypes": [
         "torch.float32"
       ],
@@ -406,6 +493,9 @@
       "rank": 5,
       "model_training": false,
       "active_dropout_modules": [],
+      "batch_invariance": {
+        "recorded": false
+      },
       "ssm_cache_dtypes": [
         "torch.float32"
       ],
@@ -417,6 +507,9 @@
       "rank": 6,
       "model_training": false,
       "active_dropout_modules": [],
+      "batch_invariance": {
+        "recorded": false
+      },
       "ssm_cache_dtypes": [
         "torch.float32"
       ],
@@ -428,6 +521,9 @@
       "rank": 7,
       "model_training": false,
       "active_dropout_modules": [],
+      "batch_invariance": {
+        "recorded": false
+      },
       "ssm_cache_dtypes": [
         "torch.float32"
       ],
@@ -451,5 +547,9 @@
       "num_valid_samples": 32.0,
       "lr": 1e-06
     }
-  ]
+  ],
+  "prompt_logprob_prefix_read_behavior": {
+    "source": "Pinned1030 vllm/sampling_params.py:539-543, request.py:307-318, core/kv_cache_manager.py:213-215,246-252",
+    "finding": "prompt_logprobs=0 defaults skip_reading_prefix_cache=True; cache management and GDN block-alignment can still depend on enable_prefix_caching"
+  }
 }

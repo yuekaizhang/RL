@@ -1,8 +1,8 @@
 # AutoModel checkpoint600 固定 token KL 排查
 
-2026-11-06 03:31 更新：**相同权重、相同 token 下，串行评分三次逐位一致，
+2026-11-06 03:52 更新：**相同权重、相同 token 下，串行评分三次逐位一致，
 4并发与32并发时出现明显重复差异。** 因此，生成端差异至少有一部分依赖
-请求调度、batch形状或缓存条件，不能全部解释为 LA1 策略滞后。
+请求调度、batch形状或缓存管理条件，不能全部解释为 LA1 策略滞后。
 不过，稳定的串行评分与同version600的policy仍有约0.00216的K3差异，
 剩余根因尚未完全定位，也不能将并发差异直接定性为某个kernel的bug。
 
@@ -28,14 +28,31 @@ checkpoint600只读，完成600→602两次真实更新。固定32条序列、26
 两步原生训练指标为：step601 genKL0.0020506231/lag0，
 step602 genKL0.0020259171/lag1；两步LR均1e-6、有效样本均32。
 这两个batch不同，不能相减当作策略滞后的因果效应。
-本轮保存的64份train和32份单步漂移数据完整；数值汇总会在下一次allocation
-复用保存数据完成，不为后处理再训练模型。
+64份train和32份单步漂移数据的补充分析已完成，复用了保存数据：
 
-下一轮 `21385207` 已提交，复用本轮**完全相同的token和policy logprob**，
-同checkpoint600，启用原1030内置的`VLLM_BATCH_INVARIANT=1`，重复同样三种
-并发量与三次评分。八个engine worker必须报告模式已实际初始化；同时核对
-跨作业初始refit抽样相同。该官方模式会一起改变多种计算和归约路径，
-即使有改善，也不能立即归因于某个单独kernel。当前尚待GPU结果。
+| 同token对照 | 第一次更新 | 第二次更新 |
+|---|---:|---:|
+| train forward与更新前eval重算 | **逐位一致，K3=0** | **逐位一致，K3=0** |
+| policy单次optimizer更新前后 | 0.00220782 | 0.00282455 |
+
+单步漂移与后端评分差异不能线性相加来预测gen KL。
+
+`21385207` 的 batch 不变性对照**未执行成功**：作业运行5分32秒，
+在生成引擎初始化时退出，原1030 vLLM selector明确拒绝该模式与`GDN_ATTN`
+组合。没有新的评分、更新或refit结果，不能据此判断该模式改善或恶化KL。
+已保留失败日志，并在提交脚本中提前拒绝该不兼容配置。
+
+检查原1030的`SamplingParams`进一步确认：`prompt_logprobs=0`默认设置
+`skip_reading_prefix_cache=True`。因此上一轮差异不能解释为直接读取了缓存
+中的共享prefix；但开启prefix cache仍会影响GDN状态的管理和分块边界。
+
+下一轮 `21385590` 已提交：只关闭prefix cache，复用21384522的完全相同
+32条token和policy logprob、同checkpoint600，chunk预算仍2048；显式固定
+SSM/conv cache为上一轮实际FP32/BF16。继续串行/4并发/32并发各三次评分，
+核对跨作业初始refit抽样相同，并完成两次真实更新及三次refit检查。
+启动前增加GDN backend selector、cache/scheduler及prompt-logprob默认行为
+预检；实际八个worker还需报告控制配置确已生效。目前尚待GPU结果。
+
 现有`vllm_cfg.fp32_lm_head`实现只支持Nemotron-H，不能直接用于当前Qwen；
 AutoModel当前路径实际生成完整logits，并非已启用fused linear CE。
 

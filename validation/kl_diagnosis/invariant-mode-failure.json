@@ -1,0 +1,10 @@
+{
+  "status": "failed_before_scoring",
+  "job": "21385207",
+  "elapsed": "00:05:32",
+  "root_cause": "Pinned vLLM0.29.0 selector explicitly rejects VLLM_BATCH_INVARIANT for GDN_ATTN",
+  "new_training_updates": 0,
+  "new_scoring_passes": 0,
+  "prior_r9_postprocessing": "completed; train/eval exact0 both; drift .00220782006/.00282454808",
+  "retry_same_unsupported_mode": false
+}
