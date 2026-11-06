@@ -13,6 +13,9 @@ job = sys.argv[1]
 preflight = len(sys.argv) > 2 and sys.argv[2] == "preflight"
 recovery = len(sys.argv) > 2 and sys.argv[2] == "recovery"
 kwargs_preflight = len(sys.argv) > 2 and sys.argv[2] == "kwargs"
+analysis = len(sys.argv) > 2 and sys.argv[2] == "analysis"
+source_job = sys.argv[3] if analysis else job
+assert job.isdecimal() and source_job.isdecimal()
 while True:
     queue = subprocess.run(
         ["squeue", "-h", "-j", job, "-o", "%T|%R"], capture_output=True, text=True
@@ -30,6 +33,8 @@ while True:
     )
     if kwargs_preflight:
         status_kind = "worker-kwargs-preflight"
+    if analysis:
+        status_kind = "scheduling-analysis"
     (root / f"results/{status_kind}-status.json").write_text(
         json.dumps(state, indent=2) + "\n"
     )
@@ -103,6 +108,21 @@ while True:
                 + ".out/.err、results/worker-preflight-"
                 + job
                 + "/recipe-preflight.json、prefix-config-tests.xml、worker-kwargs-preflight.json。核实真实typed配置、实际BaseVllmGenerationWorker参数组装的旧错误复现和修正后AsyncEngineArgs配置。失败主动修复小预检并处理依赖，成功继续核实submitted.tsv最新完整诊断；不要重复提交已有完整作业。MCore600独立监控，900hold及原checkpoint/300stop保持。"
+            )
+        if analysis:
+            message = (
+                "[已授权的固定token保存数据分析通知] 继续原任务，不创建新会话或子agent。项目 "
+                + str(repo)
+                + "。先读 validation/kl_diagnosis/HANDOFF.md 最新附录，查询 sacct -j "
+                + job
+                + "，读取 validation/kl_diagnosis/slurm/scheduling-analysis-"
+                + job
+                + ".out/.err 和 validation/kl_diagnosis/results/"
+                + source_job
+                + "/analysis.json。这是已有完整捕获数据的分析恢复，不重跑模型或训练。"
+                "核实相同token与policy参考、并发重复评分、实际cache/scheduler配置、"
+                "train/eval和单步漂移、refit探针；失败只修复必要分析，先查已有作业防重复。"
+                "MCore600独立监控，900hold及原checkpoint/300stop保持。"
             )
         env = dict(os.environ)
         prefix = "/lustre/fsw/portfolios/coreai/users/yuekaiz/tools"

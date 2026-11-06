@@ -101,7 +101,14 @@ def install():
             from validation.kl_diagnosis.scheduling import score_scheduling
 
             assert os.environ.get("SC_LP_FORCE_LEGACY_A_LOG") == "0"
-            await score_scheduling(self, sequences, original, score_one, root)
+            await score_scheduling(
+                self,
+                sequences,
+                original,
+                score_one,
+                root,
+                serial_kernel_ab=os.environ.get("SC_LP_SERIAL_KERNEL_AB") == "1",
+            )
             return None
 
         await original(self)

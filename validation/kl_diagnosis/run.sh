@@ -34,9 +34,7 @@ if [[ "${SC_LP_PREFIX_CACHE_AB:-0}" == 1 ]]; then
   /opt/ray_venvs/nemo_rl.models.generation.vllm.vllm_worker_async.VllmAsyncGenerationWorker/bin/python validation/kl_diagnosis/check_worker_kwargs.py
 fi
 uv run --no-project --python /opt/nemo_rl_venv/bin/python python validation/kl_diagnosis/run_diagnosis.py --config "$config_file" "logger.log_dir=$SC_LP_DIAG_DIR/logs" "checkpointing.checkpoint_dir=$SC_LP_DIAG_DIR/ckpts"
-if [[ "${SC_LP_SCHEDULING_AB:-0}" == 1 ]]; then
-  uv run --no-project --python /opt/nemo_rl_venv/bin/python python validation/kl_diagnosis/analyze_scheduling.py "$SC_LP_DIAG_DIR"
-else
+if [[ "${SC_LP_SCHEDULING_AB:-0}" != 1 ]]; then
   uv run --no-project --python /opt/nemo_rl_venv/bin/python python validation/kl_diagnosis/analyze.py "$SC_LP_DIAG_DIR"
   /opt/ray_venvs/nemo_rl.models.generation.vllm.vllm_worker_async.VllmAsyncGenerationWorker/bin/python validation/kl_diagnosis/analyze_gdn_state.py "$SC_LP_DIAG_DIR"
 fi

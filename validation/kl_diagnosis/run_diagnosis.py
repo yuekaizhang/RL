@@ -2,6 +2,8 @@
 
 import os
 from pathlib import Path
+import runpy
+import sys
 
 from examples import run_grpo_single_controller as launcher
 from nemo_rl.distributed import virtual_cluster
@@ -40,3 +42,16 @@ for fqn in (
     assert not executable.startswith("uv"), (fqn, executable)
     print("DIAGNOSTIC_ACTOR_INTERPRETER", fqn, executable, flush=True)
 launcher.main()
+if os.environ.get("SC_LP_SCHEDULING_AB") == "1":
+    # main() explicitly shuts down the environment and model handles. Validate
+    # durable captures before interpreter teardown, which segfaulted in the Ray
+    # policy destructor after the otherwise complete R13 run. Training or analysis
+    # exceptions still fail normally; this exit is reached only after validation.
+    sys.argv = [
+        "validation/kl_diagnosis/analyze_scheduling.py",
+        os.environ["SC_LP_DIAG_DIR"],
+    ]
+    runpy.run_path(sys.argv[0], run_name="__main__")
+    print("DIAGNOSTIC_CAPTURE_ANALYSIS_PASSED", flush=True)
+    sys.stderr.flush()
+    os._exit(0)

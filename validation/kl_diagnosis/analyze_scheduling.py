@@ -42,9 +42,14 @@ scoring_selection = (
 assert scoring_selection["train_step"] == scoring_selection["trainer_version"] == 600
 assert {tag["weight_version"] for tag in scoring_selection["tags"]} == {600}
 repeat = read("scheduling-repeats.pt")
+serial_kernel = (root / "serial-kernel-controls.json").exists()
 isolation = json.loads((root / "scheduling-isolation.json").read_text())
 assert isolation["max_foreign_requests_during_measurement"] == 0, isolation
-assert set(repeat["scores"]) == {"serial1", "microbatch4", "concurrent32"}
+assert set(repeat["scores"]) == (
+    {"flashinfer_serial1", "triton_serial1", "flashinfer_restored_serial1"}
+    if serial_kernel
+    else {"serial1", "microbatch4", "concurrent32"}
+)
 assert all(len(runs) == 3 for runs in repeat["scores"].values())
 data = scoring_selection["data"]
 masks, policies = [], []
@@ -177,7 +182,7 @@ assert all(
 )
 report = {
     "status": "completed",
-    "scope": "Checkpoint600, unchanged FP32-A_log model, identical tokens; concurrency changes request scheduling, batch shapes and possible prefix-cache reuse together, not an isolated GEMM-kernel test.",
+    "scope": "Checkpoint600, unchanged FP32-A_log model, identical tokens; concurrency changes request scheduling and batch shapes. Prompt-logprob requests skip prefix-cache reads, while cache mode can affect GDN state management and alignment. This is not an isolated GEMM-kernel test.",
     "within_mode": metrics,
     "background_isolation": isolation,
     "cross_mode": cross,
@@ -217,6 +222,49 @@ report = {
         for item in json.loads((root / "execution-profile.json").read_text())
     ],
 }
+if serial_kernel:
+    controls = json.loads((root / "serial-kernel-controls.json").read_text())
+    assert len(controls["switched"]) == len(controls["restored"]) == 8
+    assert all(item["triton_layers"] == 30 for item in controls["switched"])
+    assert all(
+        item["restored_layers"] == len(item["triton_calls"]) == 30
+        and min(item["triton_calls"].values()) > 0
+        for item in controls["restored"]
+    )
+    assert len(controls["triton_profile"]) == len(controls["restored_profile"]) == 8
+    for profile, backend in (
+        (controls["triton_profile"], "triton"),
+        (controls["restored_profile"], "flashinfer"),
+    ):
+        assert all(
+            len(item["layers"]) == 30
+            and not item["model_training"]
+            and not item["active_dropout_modules"]
+            and not item["cache_scheduler"]["enable_prefix_caching"]
+            and item["cache_scheduler"]["max_num_batched_tokens"] == 2048
+            and all(
+                layer["prefill_backend"] == backend
+                and layer["ssm_cache_dtype"] == "torch.float32"
+                and layer["conv_cache_dtype"] == "torch.bfloat16"
+                and layer["a_log_dtype"] == "torch.float32"
+                for layer in item["layers"]
+            )
+            for item in profile
+        )
+    report["serial_kernel_control"] = {
+        "scope": "One engine, identical tokens, weights and concurrency1; three warmed passes each of FlashInfer, Triton and restored FlashInfer. Only GDN prefill is switched; decode and other kernels remain unchanged.",
+        "all_within_mode_bitwise_repeatable": all(
+            pair["nonidentical_fraction"] == 0
+            for mode in metrics.values()
+            for pair in mode["repeat_pairs"].values()
+        ),
+        "flashinfer_restoration_bitwise_equal": all(
+            pair["nonidentical_fraction"] == 0
+            for pair in cross["flashinfer_serial1_vs_flashinfer_restored_serial1"]
+        ),
+        "controls": controls,
+    }
+    report["scope"] = report["serial_kernel_control"]["scope"]
 reference_path = root / "scoring-reference.json"
 if reference_path.exists():
     reference = json.loads(reference_path.read_text())
@@ -247,9 +295,14 @@ if reference_path.exists():
         "reference": reference,
         "initial_refit_hf_tensors_sampled_exact_match": len(expected),
         "scope": "Prefix cache disabled, unchanged2048 chunk budget; prompt-logprob requests already skip cache reads. This changes cache management and GDN alignment, not only prefix reuse.",
-        "matched_concurrency_pairs": {
+        "matched_serial_kernel_pairs"
+        if serial_kernel
+        else "matched_concurrency_pairs": {
             mode: [
-                compare(repeat["scores"][mode][i], source_repeats["scores"][mode][i])
+                compare(
+                    repeat["scores"][mode][i],
+                    source_repeats["scores"]["serial1" if serial_kernel else mode][i],
+                )
                 for i in range(3)
             ]
             for mode in repeat["scores"]

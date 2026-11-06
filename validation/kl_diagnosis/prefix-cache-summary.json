@@ -1,0 +1,780 @@
+{
+  "status": "completed",
+  "scope": "Checkpoint600, unchanged FP32-A_log model, identical tokens; concurrency changes request scheduling and batch shapes. Prompt-logprob requests skip prefix-cache reads, while cache mode can affect GDN state management and alignment. This is not an isolated GEMM-kernel test.",
+  "within_mode": {
+    "serial1": {
+      "repeat_pairs": {
+        "0-1": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "0-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "1-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        }
+      },
+      "policy_comparisons": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.002168075241004659,
+          "reverse_mean_k3": 0.002088036260623131,
+          "rms_logprob_delta": 0.06475678682282669,
+          "max_abs_delta": 1.1926331520080566,
+          "nonidentical_fraction": 0.8874167113425748
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.002168075241004659,
+          "reverse_mean_k3": 0.002088036260623131,
+          "rms_logprob_delta": 0.06475678682282669,
+          "max_abs_delta": 1.1926331520080566,
+          "nonidentical_fraction": 0.8874167113425748
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.002168075241004659,
+          "reverse_mean_k3": 0.002088036260623131,
+          "rms_logprob_delta": 0.06475678682282669,
+          "max_abs_delta": 1.1926331520080566,
+          "nonidentical_fraction": 0.8874167113425748
+        }
+      ]
+    },
+    "microbatch4": {
+      "repeat_pairs": {
+        "0-1": {
+          "tokens": 26114,
+          "mean_k3": 0.0011773946456920662,
+          "reverse_mean_k3": 0.0011960170356091755,
+          "rms_logprob_delta": 0.048475711846100555,
+          "max_abs_delta": 0.8863569498062134,
+          "nonidentical_fraction": 0.5651757677873938
+        },
+        "0-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0004284294281904679,
+          "reverse_mean_k3": 0.00043714880859316654,
+          "rms_logprob_delta": 0.029242996813663193,
+          "max_abs_delta": 0.8863569498062134,
+          "nonidentical_fraction": 0.25771616757294935
+        },
+        "1-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0008862298181768247,
+          "reverse_mean_k3": 0.0008798040543872425,
+          "rms_logprob_delta": 0.04183977260217756,
+          "max_abs_delta": 0.6788132190704346,
+          "nonidentical_fraction": 0.40369150647162444
+        }
+      },
+      "policy_comparisons": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.002054725254584983,
+          "reverse_mean_k3": 0.0020516900194259696,
+          "rms_logprob_delta": 0.06365488220069537,
+          "max_abs_delta": 1.0657989978790283,
+          "nonidentical_fraction": 0.8873401240713793
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.002135267027920305,
+          "reverse_mean_k3": 0.0020720552259890076,
+          "rms_logprob_delta": 0.06440482151619277,
+          "max_abs_delta": 1.1926331520080566,
+          "nonidentical_fraction": 0.8877230604273569
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0021035087302658066,
+          "reverse_mean_k3": 0.00206539291583653,
+          "rms_logprob_delta": 0.0640973096968691,
+          "max_abs_delta": 1.0792468786239624,
+          "nonidentical_fraction": 0.8878379413341503
+        }
+      ]
+    },
+    "concurrent32": {
+      "repeat_pairs": {
+        "0-1": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "0-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0017751384359235786,
+          "reverse_mean_k3": 0.0017565702175725507,
+          "rms_logprob_delta": 0.0590876558876031,
+          "max_abs_delta": 0.8608388900756836,
+          "nonidentical_fraction": 0.7827602052538868
+        },
+        "1-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0017751384359235786,
+          "reverse_mean_k3": 0.0017565702175725507,
+          "rms_logprob_delta": 0.0590876558876031,
+          "max_abs_delta": 0.8608388900756836,
+          "nonidentical_fraction": 0.7827602052538868
+        }
+      },
+      "policy_comparisons": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0022499440131624917,
+          "reverse_mean_k3": 0.002258139077893889,
+          "rms_logprob_delta": 0.06646817483493621,
+          "max_abs_delta": 1.3569788932800293,
+          "nonidentical_fraction": 0.8868040131730106
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0022499440131624917,
+          "reverse_mean_k3": 0.002258139077893889,
+          "rms_logprob_delta": 0.06646817483493621,
+          "max_abs_delta": 1.3569788932800293,
+          "nonidentical_fraction": 0.8868040131730106
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0021705845862368006,
+          "reverse_mean_k3": 0.0021713344109093573,
+          "rms_logprob_delta": 0.06530183668868454,
+          "max_abs_delta": 1.4028136730194092,
+          "nonidentical_fraction": 0.8856552041050777
+        }
+      ]
+    }
+  },
+  "background_isolation": {
+    "initial_unfinished_requests": 0,
+    "drain_seconds": 0.20106226997449994,
+    "max_foreign_requests_during_measurement": 0
+  },
+  "cross_mode": {
+    "serial1_vs_microbatch4": [
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0012828419916891844,
+        "reverse_mean_k3": 0.001319444031412728,
+        "rms_logprob_delta": 0.050734075599334995,
+        "max_abs_delta": 0.8863569498062134,
+        "nonidentical_fraction": 0.6055372597074367
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0006201535349014479,
+        "reverse_mean_k3": 0.0006319777550487998,
+        "rms_logprob_delta": 0.035247566504855436,
+        "max_abs_delta": 0.7638225555419922,
+        "nonidentical_fraction": 0.34582982308340354
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0010937100477997667,
+        "reverse_mean_k3": 0.0011171903595253896,
+        "rms_logprob_delta": 0.04677706906333541,
+        "max_abs_delta": 0.8240983486175537,
+        "nonidentical_fraction": 0.5009956345255419
+      }
+    ],
+    "serial1_vs_concurrent32": [
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0016120344692617272,
+        "reverse_mean_k3": 0.0016528679416641945,
+        "rms_logprob_delta": 0.056654563669975996,
+        "max_abs_delta": 1.3295115232467651,
+        "nonidentical_fraction": 0.7227923719077889
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0016120344692617272,
+        "reverse_mean_k3": 0.0016528679416641945,
+        "rms_logprob_delta": 0.056654563669975996,
+        "max_abs_delta": 1.3295115232467651,
+        "nonidentical_fraction": 0.7227923719077889
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.001853143283997565,
+        "reverse_mean_k3": 0.0018864734233536111,
+        "rms_logprob_delta": 0.06064017916306012,
+        "max_abs_delta": 1.3295115232467651,
+        "nonidentical_fraction": 0.819675269970131
+      }
+    ],
+    "microbatch4_vs_concurrent32": [
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0015620967825721505,
+        "reverse_mean_k3": 0.0015705369190248768,
+        "rms_logprob_delta": 0.05555675611864057,
+        "max_abs_delta": 1.0948991775512695,
+        "nonidentical_fraction": 0.6953358351841924
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0016012764570522136,
+        "reverse_mean_k3": 0.0016236981059188766,
+        "rms_logprob_delta": 0.05633924798321396,
+        "max_abs_delta": 1.3295115232467651,
+        "nonidentical_fraction": 0.7328635980700008
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.001757118082638552,
+        "reverse_mean_k3": 0.0017569199832021373,
+        "rms_logprob_delta": 0.05888782046255663,
+        "max_abs_delta": 1.022521734237671,
+        "nonidentical_fraction": 0.8124760664777514
+      }
+    ]
+  },
+  "resident_parameter_checks": [
+    {
+      "rank": 0,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 1,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 2,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 3,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 4,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 5,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 6,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 7,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    }
+  ],
+  "refit_transport": [
+    {
+      "refit": 0,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    },
+    {
+      "refit": 1,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    },
+    {
+      "refit": 2,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    }
+  ],
+  "fp32_a_log_wire_verified": true,
+  "per_step": {
+    "600": {
+      "train_eval": {
+        "tokens": 26376,
+        "mean_k3": 0.0,
+        "reverse_mean_k3": 0.0,
+        "rms_logprob_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      },
+      "generation_policy": {
+        "tokens": 26376,
+        "mean_k3": 0.0022043992703727603,
+        "reverse_mean_k3": 0.00241592471566684,
+        "rms_logprob_delta": 0.06720451808537962,
+        "max_abs_delta": 1.8493711948394775,
+        "nonidentical_fraction": 0.8986957840461025
+      },
+      "drift": {
+        "tokens": 26376,
+        "mean_k3": 0.0024146680353035023,
+        "reverse_mean_k3": 0.002585208538640229,
+        "rms_logprob_delta": 0.06977637155703569,
+        "max_abs_delta": 1.8270447254180908,
+        "nonidentical_fraction": 0.8886108583560813
+      }
+    },
+    "601": {
+      "train_eval": {
+        "tokens": 25097,
+        "mean_k3": 0.0,
+        "reverse_mean_k3": 0.0,
+        "rms_logprob_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      },
+      "generation_policy": {
+        "tokens": 25097,
+        "mean_k3": 0.0018909452865222133,
+        "reverse_mean_k3": 0.00199231027226709,
+        "rms_logprob_delta": 0.06186026601763801,
+        "max_abs_delta": 1.1893662214279175,
+        "nonidentical_fraction": 0.8707813682910308
+      },
+      "drift": {
+        "tokens": 25097,
+        "mean_k3": 0.0026344104452957428,
+        "reverse_mean_k3": 0.0028571782232123064,
+        "rms_logprob_delta": 0.07234329774232208,
+        "max_abs_delta": 2.235102415084839,
+        "nonidentical_fraction": 0.8609793999282783
+      }
+    }
+  },
+  "admission": [
+    {
+      "trainer_version": 600,
+      "rollout_versions": [
+        600
+      ],
+      "lag": 0,
+      "unique_samples": 32
+    },
+    {
+      "trainer_version": 601,
+      "rollout_versions": [
+        600
+      ],
+      "lag": 1,
+      "unique_samples": 32
+    }
+  ],
+  "pass_order": [
+    "concurrent32",
+    "serial1",
+    "microbatch4",
+    "microbatch4",
+    "serial1",
+    "concurrent32",
+    "serial1",
+    "concurrent32",
+    "microbatch4"
+  ],
+  "pass_seconds": [
+    1.5869449633173645,
+    3.0452193208038807,
+    2.122505482286215,
+    2.253714632242918,
+    3.034547237213701,
+    1.5788504420779645,
+    3.0255141449160874,
+    1.594737074803561,
+    2.3008388592861593
+  ],
+  "actual_sampling_profile": {
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "top_k": -1,
+    "min_p": 0.0,
+    "min_tokens": 0,
+    "ignore_eos": false,
+    "repetition_penalty": 1.0,
+    "presence_penalty": 0.0,
+    "frequency_penalty": 0.0
+  },
+  "actual_execution_profile": [
+    {
+      "rank": 0,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 1,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 2,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 3,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 4,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 5,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 6,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 7,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    }
+  ],
+  "prefix_cache_disabled_vs_original_same_tokens": {
+    "reference": {
+      "source": "/lustre/fsw/portfolios/coreai/users/yuekaiz/single_controller/RL-pr4963/validation/kl_diagnosis/results/21384522",
+      "checkpoint_step": 600,
+      "control": "prefix_cache_disabled"
+    },
+    "initial_refit_hf_tensors_sampled_exact_match": 1026,
+    "scope": "Prefix cache disabled, unchanged2048 chunk budget; prompt-logprob requests already skip cache reads. This changes cache management and GDN alignment, not only prefix reuse.",
+    "matched_concurrency_pairs": {
+      "serial1": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.001127047689171088,
+          "reverse_mean_k3": 0.001141092921035951,
+          "rms_logprob_delta": 0.04734817117710603,
+          "max_abs_delta": 1.0196805000305176,
+          "nonidentical_fraction": 0.637244389982385
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.001127047689171088,
+          "reverse_mean_k3": 0.001141092921035951,
+          "rms_logprob_delta": 0.04734817117710603,
+          "max_abs_delta": 1.0196805000305176,
+          "nonidentical_fraction": 0.637244389982385
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.001127047689171088,
+          "reverse_mean_k3": 0.001141092921035951,
+          "rms_logprob_delta": 0.04734817117710603,
+          "max_abs_delta": 1.0196805000305176,
+          "nonidentical_fraction": 0.637244389982385
+        }
+      ],
+      "microbatch4": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0014650325397493331,
+          "reverse_mean_k3": 0.001438089570319259,
+          "rms_logprob_delta": 0.05351000713436929,
+          "max_abs_delta": 1.2815895080566406,
+          "nonidentical_fraction": 0.7144443593474764
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0014660356297458831,
+          "reverse_mean_k3": 0.001468921627677021,
+          "rms_logprob_delta": 0.053862889521148614,
+          "max_abs_delta": 0.94130539894104,
+          "nonidentical_fraction": 0.6861836562763268
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0014185782106248563,
+          "reverse_mean_k3": 0.0014146602283169833,
+          "rms_logprob_delta": 0.052895456533917,
+          "max_abs_delta": 0.9742932319641113,
+          "nonidentical_fraction": 0.6989737305659799
+        }
+      ],
+      "concurrent32": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0019262538768962,
+          "reverse_mean_k3": 0.001975644626872208,
+          "rms_logprob_delta": 0.06198386458993313,
+          "max_abs_delta": 1.1541154384613037,
+          "nonidentical_fraction": 0.8434173240407444
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.002040337506600778,
+          "reverse_mean_k3": 0.0019816262481785847,
+          "rms_logprob_delta": 0.06294173570366318,
+          "max_abs_delta": 1.1263561248779297,
+          "nonidentical_fraction": 0.852875852033392
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0018841785283795374,
+          "reverse_mean_k3": 0.0018423152650739732,
+          "rms_logprob_delta": 0.06071020422023115,
+          "max_abs_delta": 0.9788637161254883,
+          "nonidentical_fraction": 0.8579306119322968
+        }
+      ]
+    }
+  },
+  "capture_job": {
+    "id": 21390581,
+    "state": "FAILED",
+    "exit_code": "11:0",
+    "elapsed": "00:12:23",
+    "phase": "Both real updates and all captures completed; interpreter shutdown before external analyzer"
+  },
+  "analysis_job": {
+    "id": 21391605,
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed": "00:02:28",
+    "scope": "Saved captures only; no model, training or checkpoint writes"
+  },
+  "reference_job": 21384522,
+  "native_train_metrics": [
+    {
+      "nemo_rl/step": 601,
+      "gen_kl_error": 0.0022044032957637683,
+      "policy_kl_error": 0.0024159289941962925,
+      "weight_version_lag": 0,
+      "lr": 1e-06,
+      "num_valid_samples": 32.0,
+      "dropped_prompt_groups": 0,
+      "num_masked_seqs_by_logprob_error": 0,
+      "mean_gen_tokens_per_sample": 824.25,
+      "reward": 0.875,
+      "loss": 0.0,
+      "approx_entropy": 0.2896199031965807
+    },
+    {
+      "nemo_rl/step": 602,
+      "gen_kl_error": 0.0018909491650447308,
+      "policy_kl_error": 0.001992313826121972,
+      "weight_version_lag": 1,
+      "lr": 1e-06,
+      "num_valid_samples": 32.0,
+      "dropped_prompt_groups": 0,
+      "num_masked_seqs_by_logprob_error": 0,
+      "mean_gen_tokens_per_sample": 784.28125,
+      "reward": 0.90625,
+      "loss": 0.012898117303848267,
+      "approx_entropy": 0.20974481059238315
+    }
+  ],
+  "reference_actual_engine": {
+    "21384522": {
+      "enable_prefix_caching": true,
+      "enable_chunked_prefill": true,
+      "chunk_budgets": [
+        2048
+      ]
+    },
+    "21390581": {
+      "enable_prefix_caching": false,
+      "enable_chunked_prefill": true,
+      "chunk_budgets": [
+        2048
+      ]
+    }
+  },
+  "interpretation": {
+    "prefix_cache_disabled_does_not_remove_concurrency_variation": true,
+    "stable_serial_policy_gap_not_improved": true,
+    "serial_cross_run_k3": 0.001127047689171088,
+    "cross_run_caveat": "Separate engine runs/nodes; this difference does not isolate the cache flag alone. Same-engine serial kernel controls are the next test.",
+    "fix_scope": "FP32 A_log transport is verified; typed prefix-cache flag corrected. Neither is established as a complete numerical KL fix."
+  }
+}

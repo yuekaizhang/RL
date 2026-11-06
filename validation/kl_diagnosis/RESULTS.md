@@ -1,6 +1,48 @@
 # AutoModel checkpoint600 固定 token KL 排查
 
-2026-11-06 06:50 更新：**相同权重、相同 token 下，串行评分三次逐位一致，
+2026-11-06 更新：**关闭prefix cache并没有解决重复评分差异，也没有缩小
+稳定的串行评分与policy之间的差距。** 因此不把关闭cache当作训练修复。
+本轮继续支持“至少一部分误差来自后端计算条件，而非LA1策略滞后”，但尚不能
+指认某个GDN kernel、AutoModel算子或vLLM实现为完整根因。
+
+R13 `21390581` 完成600→602两次真实更新和三次refit后，在解释器清理阶段
+崩溃（Slurm exit11，12分23秒）；64份train、32份drift及全部refit/评分捕获齐全。
+只用1GPU分析任务 `21391605` 恢复末尾分析，**COMPLETED/exit0，2分28秒**，
+没有重跑模型、训练或改动原checkpoint。机器结果见
+[prefix-cache-summary.json](prefix-cache-summary.json)。
+
+固定使用R9的32条序列、26,114个response token及保存的同version600 policy
+logprob。相同token逐个核对，初始refit的1026个HF tensor抽样也精确一致。
+实际引擎日志确认旧轮cache开启、新轮关闭，chunk budget均2048；新轮全部
+8rank探针确认cache=false、Mamba cache mode=none、SSM FP32/conv BF16，
+GDN prefill仍为FlashInfer，A_log FP32，没有开启不支持的batch-invariant模式。
+
+| 相同权重/token的mean K3对照 | 原cache开启（R9） | cache关闭（R13） |
+|---|---:|---:|
+| 串行1，三组重复两两比较 | 全部0 | 全部0 |
+| 并发4，三组重复两两比较 | 0.000702 / 0.001277 / 0.001167 | 0.001177 / 0.000428 / 0.000886 |
+| 并发32，三组重复两两比较 | 0.001309 / 0.001309 / 0 | 0 / 0.001775 / 0.001775 |
+| 串行评分与相同policy，三次稳定值 | 0.00216220 | 0.00216808 |
+
+cache开关不同的两轮串行评分彼此仍有K3约0.001127差异；由于来自不同引擎
+运行及节点，这不能单独归因于cache，更不能据此宣称cache存在错误。并发重复
+波动没有消失，串行与policy的整体差距也几乎不变。
+
+R13中评分期间外部请求数始终0，8rank各906个resident tensor抽样前后逐位不变。
+三次refit每次1026个HF tensor在8rank抽样精确匹配，30层A_log wire FP32、
+误差0。两步train/eval重算均逐位一致，单步policy漂移K3约0.002415/0.002634。
+原生step601/602 genKL约0.00220440/0.00189095，离线同batch重算差约4e-9；
+lag分别0/1、LR均1e-6、有效样本均32、丢弃及logprob mask均0。两步训练batch
+与R9并不相同，不能直接比较原生KL来估计cache或lag的因果效应。
+
+下一轮 `21392111` 已提交：在同一个引擎、相同权重/token、并发量固定为1时，
+依次比较FlashInfer三次、Triton三次、恢复FlashInfer三次。每种路径预热、
+每轮reset cache，验证30层×8rank的实际切换、调用计数、权重不变和恢复负对照。
+只切GDN prefill，decode和其他算子保持原状。该对照尚未产出结果。
+诊断runner把分析移到解释器退出前；仅在训练、显式资源关闭和分析均成功后
+结束进程，避开本轮已复现的Ray析构崩溃。未修改生产训练的退出行为。
+
+此前R9（2026-11-06 06:50）：**相同权重、相同 token 下，串行评分三次逐位一致，
 4并发与32并发时出现明显重复差异。** 因此，生成端差异至少有一部分依赖
 请求调度、batch形状或缓存管理条件，不能全部解释为 LA1 策略滞后。
 不过，稳定的串行评分与同version600的policy仍有约0.00216的K3差异，
@@ -84,10 +126,9 @@ BF16、dummy加载，Mamba cache mode为`none`，没有创建engine或加载模�
 输出捕获冲突，以及`--vllm-only`排除了未标记的纯单元测试。它们不算测试
 通过；最终预检固定pytest8.4.2、关闭捕获并显式执行五个测试节点。
 
-完整同配置对照 **21390581** 依赖最终预检成功，目前等待调度；没有重复提交
-完整实验。继续复用相同R9 token、policy logprob和checkpoint600，chunk2048、
-cache精度、两次更新与三次refit保持原计划。当前尚无关闭prefix cache后的
-KL数值。MCore600两组首段21388471／21388475仍排队，原300步checkpoint保留。
+完整同配置对照 **21390581** 的捕获与恢复分析均已完成，关闭prefix cache后的
+数值结果及分析恢复范围见本文开头。MCore600两组首段21388471／21388475仍排队，
+原300步checkpoint保留。
 
 现有`vllm_cfg.fp32_lm_head`实现只支持Nemotron-H，不能直接用于当前Qwen；
 AutoModel当前路径实际生成完整logits，并非已启用fused linear CE。
