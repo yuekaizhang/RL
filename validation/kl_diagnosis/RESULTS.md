@@ -1,6 +1,80 @@
 # AutoModel checkpoint600 固定 token KL 排查
 
-2026-11-06 更新：**关闭prefix cache并没有解决重复评分差异，也没有缩小
+2026-11-06 09:18 更新：**在同一个引擎、相同权重和token、固定串行条件下，
+仅切换GDN prefill后端，完整模型logprob会稳定改变；但换成Triton没有改善
+与policy之间的差距。** 这把一个可重复的数值影响定位到了prefill路径选择，
+仍不能据此判断哪个实现错误，或将全部gen KL归因于该kernel。
+
+完整作业 **21392111 COMPLETED/exit0，13分13秒**，完成两次真实更新和三次refit，
+末尾分析与退出均成功。继续用R9的32序列、26,114个response token及同一
+checkpoint600 policy参考；初始1026个HF tensor抽样精确一致。每阶段先预热，
+然后按FlashInfer三次→Triton三次→恢复FlashInfer三次执行，始终并发1。
+机器证据见 [serial-kernel-summary.json](serial-kernel-summary.json)。
+
+| 同引擎、同权重/token的对照 | mean K3 |
+|---|---:|
+| FlashInfer三次重复两两比较 | 全部0，逐位一致 |
+| Triton三次重复两两比较 | 全部0，逐位一致 |
+| 恢复FlashInfer三次重复两两比较 | 全部0，逐位一致 |
+| 恢复FlashInfer与切换前FlashInfer | 全部0，逐位一致 |
+| FlashInfer与Triton，三次 | 稳定0.00220373 |
+| FlashInfer与相同policy | 稳定0.00216808 |
+| Triton与相同policy | 稳定0.00224619 |
+
+全部30层×8rank实际切换并恢复，每层Triton均调用144次。decode仍是CUDA，
+cache始终关闭、chunk budget2048，SSM FP32/conv BF16/A_log FP32；没有外部
+请求混入，906个resident tensor/rank抽样前后逐位不变，三次refit每次1026个
+HF tensor在8rank抽样精确匹配。两步train/eval重算均逐位一致，policy单步
+漂移K3约0.002314/0.002264。原生step601/602 genKL约0.00214324/0.00186997，
+lag0/1、LR1e-6、有效样本32，离线重算与原生值相差约4e-9。训练batch不同，
+不能用这些原生值与上一轮直接相减来估计内核效果。
+
+单层重放 **21398471 COMPLETED/exit0，3分20秒**，只用1GPU，没有加载模型或
+训练。实际第一层677个token，q/k/v BF16、g/beta FP32、初始state为0；捕获的
+`use_qk_l2norm_in_kernel=false`，因此保持已预处理输入，没有额外再归一化。
+原FlashInfer/Triton各自输出与最终state重复三次均逐位一致，二者输出彼此的
+相对RMS差异为0.231%，最终state为0.286%。见
+[gdn-kernel-summary.json](gdn-kernel-summary.json)。
+
+| 同输入与FP64逐token递推的相对RMS误差 | 输出 | 最终state |
+|---|---:|---:|
+| FlashInfer chunk prefill | 0.1843% | 0.1774% |
+| Triton chunk prefill | 0.1964% | 0.2302% |
+| FP32 recurrent | 0.1589% | 0.000223% |
+| FP64参考仅将输出舍入BF16 | 0.1589% | 不适用 |
+
+FP32 recurrent的输出误差接近BF16输出舍入下限，支持该数学参考与当前输入
+约定相容；两种chunk prefill包含额外的计算精度差异。这里没有完整模型输出
+或loss，也不能把单层相对RMS与完整模型K3线性相加，尚不能定性为kernel bug。
+
+实际policy primitive对照 **21398928 COMPLETED/exit0，3分39秒**，仍只1GPU。
+先在CPU建立FP32/FP64逐token参考，再在原policy环境构造一个未训练的
+`CPAwareGatedDeltaNet`仅检查绑定，确认是`fla.ops.gated_delta_rule.chunk`的
+`chunk_gated_delta_rule`。不使用组件权重，不加载checkpoint或完整模型。
+
+相同的预处理后q/k/v/g/beta输入逐值核对，按AutoModel源码把q/k扩展为4头。
+生成侧FlashInfer、Triton扩头前后输出均逐位不变。policy primitive两种beta
+精度下各3次重复的输出和state也均逐位一致。机器结果见
+[policy-gdn-summary.json](policy-gdn-summary.json)。
+
+| 相同单层输入、同shape的输出对照 | 相对RMS差异 |
+|---|---:|
+| vLLM FlashInfer vs policy FLA（共享FP32 beta） | 0.2433% |
+| vLLM Triton vs policy FLA（共享FP32 beta） | 0.1478% |
+| vLLM FlashInfer vs policy FLA（BF16 beta反事实） | 0.2475% |
+| vLLM Triton vs policy FLA（BF16 beta反事实） | 0.2444% |
+
+CPU FP32递推与CPU FP64的输出相对RMS差约1.55e-7，CPU/GPU FP64参考差约
+3e-16，支持数学参考的实现及布局相容。policy FLA的最终state契约是K,V，
+vLLM参考是V,K；按API转置后比较，没有把直接比较不同布局产生的大差异
+误当成bug。policy FLA对FP64参考的输出误差约0.1992%（共享FP32 beta）。
+
+这直接验证了训练/生成环境的GDN primitive即使输入相同仍有数值差异，但它
+不是完整GDN层的投影、卷积、门控或归一化对照。BF16 beta是源码动机的独立
+反事实，没有捕获policy的原始投影值，不能把该差异全部归因于实际beta精度。
+当前没有根据将某一条路径定性为bug，也不采用切内核或关cache作为生产修复。
+
+此前R13：**关闭prefix cache并没有解决重复评分差异，也没有缩小
 稳定的串行评分与policy之间的差距。** 因此不把关闭cache当作训练修复。
 本轮继续支持“至少一部分误差来自后端计算条件，而非LA1策略滞后”，但尚不能
 指认某个GDN kernel、AutoModel算子或vLLM实现为完整根因。
@@ -35,10 +109,8 @@ R13中评分期间外部请求数始终0，8rank各906个resident tensor抽样�
 lag分别0/1、LR均1e-6、有效样本均32、丢弃及logprob mask均0。两步训练batch
 与R9并不相同，不能直接比较原生KL来估计cache或lag的因果效应。
 
-下一轮 `21392111` 已提交：在同一个引擎、相同权重/token、并发量固定为1时，
-依次比较FlashInfer三次、Triton三次、恢复FlashInfer三次。每种路径预热、
-每轮reset cache，验证30层×8rank的实际切换、调用计数、权重不变和恢复负对照。
-只切GDN prefill，decode和其他算子保持原状。该对照尚未产出结果。
+后续 `21392111` 的同引擎串行FlashInfer/Triton/恢复FlashInfer对照已成功完成，
+数值结果、恢复检查及后续单层计划见本文开头。
 诊断runner把分析移到解释器退出前；仅在训练、显式资源关闭和分析均成功后
 结束进程，避开本轮已复现的Ray析构崩溃。未修改生产训练的退出行为。
 

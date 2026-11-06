@@ -14,7 +14,8 @@ preflight = len(sys.argv) > 2 and sys.argv[2] == "preflight"
 recovery = len(sys.argv) > 2 and sys.argv[2] == "recovery"
 kwargs_preflight = len(sys.argv) > 2 and sys.argv[2] == "kwargs"
 analysis = len(sys.argv) > 2 and sys.argv[2] == "analysis"
-source_job = sys.argv[3] if analysis else job
+kernel_replay = len(sys.argv) > 2 and sys.argv[2] == "layer"
+source_job = sys.argv[3] if analysis or kernel_replay else job
 assert job.isdecimal() and source_job.isdecimal()
 while True:
     queue = subprocess.run(
@@ -35,6 +36,8 @@ while True:
         status_kind = "worker-kwargs-preflight"
     if analysis:
         status_kind = "scheduling-analysis"
+    if kernel_replay:
+        status_kind = "gdn-kernel-replay"
     (root / f"results/{status_kind}-status.json").write_text(
         json.dumps(state, indent=2) + "\n"
     )
@@ -123,6 +126,24 @@ while True:
                 "核实相同token与policy参考、并发重复评分、实际cache/scheduler配置、"
                 "train/eval和单步漂移、refit探针；失败只修复必要分析，先查已有作业防重复。"
                 "MCore600独立监控，900hold及原checkpoint/300stop保持。"
+            )
+        if kernel_replay:
+            message = (
+                "[已授权的单层GDN内核重放通知] 继续原任务，不创建新会话或子agent。项目 "
+                + str(repo)
+                + "。先读 validation/kl_diagnosis/HANDOFF.md 最新附录，查询 sacct -j "
+                + job
+                + "，读取 validation/kl_diagnosis/slurm/gdn-kernel-"
+                + job
+                + ".out/.err 和 validation/kl_diagnosis/results/"
+                + source_job
+                + "/gdn-kernel-analysis.json。只使用已有单层输入，不重跑完整模型或训练。"
+                "若HANDOFF记录本轮包含policy primitive对照，还必须核实policy-gdn-analysis.json"
+                "及新产物中的policy_primitive_parity，不能把旧单层结果当本轮完成。"
+                "核实原FlashInfer/Triton路径重复性、相同输入输出/state差异、共同q/k归一化"
+                "及FP64逐token参考的计算假设；单层结果不能直接等同完整模型KL根因。"
+                "失败主动修复并续验证，先查已有作业防重复。MCore600独立监控，"
+                "900hold及原checkpoint/300stop保持。"
             )
         env = dict(os.environ)
         prefix = "/lustre/fsw/portfolios/coreai/users/yuekaiz/tools"

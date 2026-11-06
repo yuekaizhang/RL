@@ -1,0 +1,1521 @@
+{
+  "status": "completed",
+  "scope": "One engine, identical tokens, weights and concurrency1; three warmed passes each of FlashInfer, Triton and restored FlashInfer. Only GDN prefill is switched; decode and other kernels remain unchanged.",
+  "within_mode": {
+    "flashinfer_serial1": {
+      "repeat_pairs": {
+        "0-1": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "0-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "1-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        }
+      },
+      "policy_comparisons": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.002168075241004659,
+          "reverse_mean_k3": 0.002088036260623131,
+          "rms_logprob_delta": 0.06475678682282669,
+          "max_abs_delta": 1.1926331520080566,
+          "nonidentical_fraction": 0.8874167113425748
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.002168075241004659,
+          "reverse_mean_k3": 0.002088036260623131,
+          "rms_logprob_delta": 0.06475678682282669,
+          "max_abs_delta": 1.1926331520080566,
+          "nonidentical_fraction": 0.8874167113425748
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.002168075241004659,
+          "reverse_mean_k3": 0.002088036260623131,
+          "rms_logprob_delta": 0.06475678682282669,
+          "max_abs_delta": 1.1926331520080566,
+          "nonidentical_fraction": 0.8874167113425748
+        }
+      ]
+    },
+    "triton_serial1": {
+      "repeat_pairs": {
+        "0-1": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "0-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "1-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        }
+      },
+      "policy_comparisons": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0022461894111798415,
+          "reverse_mean_k3": 0.002211243205102827,
+          "rms_logprob_delta": 0.0662389953769308,
+          "max_abs_delta": 1.1030985116958618,
+          "nonidentical_fraction": 0.8893696867580608
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0022461894111798415,
+          "reverse_mean_k3": 0.002211243205102827,
+          "rms_logprob_delta": 0.0662389953769308,
+          "max_abs_delta": 1.1030985116958618,
+          "nonidentical_fraction": 0.8893696867580608
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0022461894111798415,
+          "reverse_mean_k3": 0.002211243205102827,
+          "rms_logprob_delta": 0.0662389953769308,
+          "max_abs_delta": 1.1030985116958618,
+          "nonidentical_fraction": 0.8893696867580608
+        }
+      ]
+    },
+    "flashinfer_restored_serial1": {
+      "repeat_pairs": {
+        "0-1": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "0-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "1-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        }
+      },
+      "policy_comparisons": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.002168075241004659,
+          "reverse_mean_k3": 0.002088036260623131,
+          "rms_logprob_delta": 0.06475678682282669,
+          "max_abs_delta": 1.1926331520080566,
+          "nonidentical_fraction": 0.8874167113425748
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.002168075241004659,
+          "reverse_mean_k3": 0.002088036260623131,
+          "rms_logprob_delta": 0.06475678682282669,
+          "max_abs_delta": 1.1926331520080566,
+          "nonidentical_fraction": 0.8874167113425748
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.002168075241004659,
+          "reverse_mean_k3": 0.002088036260623131,
+          "rms_logprob_delta": 0.06475678682282669,
+          "max_abs_delta": 1.1926331520080566,
+          "nonidentical_fraction": 0.8874167113425748
+        }
+      ]
+    }
+  },
+  "background_isolation": {
+    "initial_unfinished_requests": 0,
+    "drain_seconds": 0.20106650795787573,
+    "max_foreign_requests_during_measurement": 0
+  },
+  "cross_mode": {
+    "flashinfer_serial1_vs_triton_serial1": [
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0022037343732919873,
+        "reverse_mean_k3": 0.0022848186906828014,
+        "rms_logprob_delta": 0.06646733267758297,
+        "max_abs_delta": 1.254136085510254,
+        "nonidentical_fraction": 0.871524852569503
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0022037343732919873,
+        "reverse_mean_k3": 0.0022848186906828014,
+        "rms_logprob_delta": 0.06646733267758297,
+        "max_abs_delta": 1.254136085510254,
+        "nonidentical_fraction": 0.871524852569503
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0022037343732919873,
+        "reverse_mean_k3": 0.0022848186906828014,
+        "rms_logprob_delta": 0.06646733267758297,
+        "max_abs_delta": 1.254136085510254,
+        "nonidentical_fraction": 0.871524852569503
+      }
+    ],
+    "flashinfer_serial1_vs_flashinfer_restored_serial1": [
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0,
+        "reverse_mean_k3": 0.0,
+        "rms_logprob_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0,
+        "reverse_mean_k3": 0.0,
+        "rms_logprob_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0,
+        "reverse_mean_k3": 0.0,
+        "rms_logprob_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      }
+    ],
+    "triton_serial1_vs_flashinfer_restored_serial1": [
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0022848186906828014,
+        "reverse_mean_k3": 0.0022037343732919873,
+        "rms_logprob_delta": 0.06646733267758297,
+        "max_abs_delta": 1.254136085510254,
+        "nonidentical_fraction": 0.871524852569503
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0022848186906828014,
+        "reverse_mean_k3": 0.0022037343732919873,
+        "rms_logprob_delta": 0.06646733267758297,
+        "max_abs_delta": 1.254136085510254,
+        "nonidentical_fraction": 0.871524852569503
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0022848186906828014,
+        "reverse_mean_k3": 0.0022037343732919873,
+        "rms_logprob_delta": 0.06646733267758297,
+        "max_abs_delta": 1.254136085510254,
+        "nonidentical_fraction": 0.871524852569503
+      }
+    ]
+  },
+  "resident_parameter_checks": [
+    {
+      "rank": 0,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 1,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 2,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 3,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 4,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 5,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 6,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 7,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    }
+  ],
+  "refit_transport": [
+    {
+      "refit": 0,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    },
+    {
+      "refit": 1,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    },
+    {
+      "refit": 2,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    }
+  ],
+  "fp32_a_log_wire_verified": true,
+  "per_step": {
+    "600": {
+      "train_eval": {
+        "tokens": 24688,
+        "mean_k3": 0.0,
+        "reverse_mean_k3": 0.0,
+        "rms_logprob_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      },
+      "generation_policy": {
+        "tokens": 24688,
+        "mean_k3": 0.0021432410742835465,
+        "reverse_mean_k3": 0.002414195500993181,
+        "rms_logprob_delta": 0.06670452156497347,
+        "max_abs_delta": 1.8493711948394775,
+        "nonidentical_fraction": 0.8977235904082955
+      },
+      "drift": {
+        "tokens": 24688,
+        "mean_k3": 0.002313884443855356,
+        "reverse_mean_k3": 0.0024057242244625455,
+        "rms_logprob_delta": 0.06776286519587718,
+        "max_abs_delta": 1.8270447254180908,
+        "nonidentical_fraction": 0.8879212572909916
+      }
+    },
+    "601": {
+      "train_eval": {
+        "tokens": 24408,
+        "mean_k3": 0.0,
+        "reverse_mean_k3": 0.0,
+        "rms_logprob_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      },
+      "generation_policy": {
+        "tokens": 24408,
+        "mean_k3": 0.0018699683241279377,
+        "reverse_mean_k3": 0.0019682269414749306,
+        "rms_logprob_delta": 0.0615176967360195,
+        "max_abs_delta": 1.0101428031921387,
+        "nonidentical_fraction": 0.8704113405440839
+      },
+      "drift": {
+        "tokens": 24408,
+        "mean_k3": 0.0022639360135707884,
+        "reverse_mean_k3": 0.0024060032952986257,
+        "rms_logprob_delta": 0.06742877997751498,
+        "max_abs_delta": 1.784281849861145,
+        "nonidentical_fraction": 0.8583251392985907
+      }
+    }
+  },
+  "admission": [
+    {
+      "trainer_version": 600,
+      "rollout_versions": [
+        600
+      ],
+      "lag": 0,
+      "unique_samples": 32
+    },
+    {
+      "trainer_version": 601,
+      "rollout_versions": [
+        600
+      ],
+      "lag": 1,
+      "unique_samples": 32
+    }
+  ],
+  "pass_order": [
+    "flashinfer_serial1",
+    "flashinfer_serial1",
+    "flashinfer_serial1",
+    "triton_serial1",
+    "triton_serial1",
+    "triton_serial1",
+    "flashinfer_restored_serial1",
+    "flashinfer_restored_serial1",
+    "flashinfer_restored_serial1"
+  ],
+  "pass_seconds": [
+    3.0307187708094716,
+    3.0699582397937775,
+    3.029842206276953,
+    3.3278375933878124,
+    3.328272252343595,
+    3.3214386058971286,
+    3.1146595031023026,
+    3.0643792059272528,
+    3.053906518034637
+  ],
+  "actual_sampling_profile": {
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "top_k": -1,
+    "min_p": 0.0,
+    "min_tokens": 0,
+    "ignore_eos": false,
+    "repetition_penalty": 1.0,
+    "presence_penalty": 0.0,
+    "frequency_penalty": 0.0
+  },
+  "actual_execution_profile": [
+    {
+      "rank": 0,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 1,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 2,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 3,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 4,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 5,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 6,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 7,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "batch_invariance": {
+        "env_enabled": false,
+        "initialized": false,
+        "cublas_workspace_config": null,
+        "cublaslt_workspace_size": null,
+        "fp32_matmul_precision": "ieee",
+        "bf16_reduced_precision_reduction": true
+      },
+      "cache_scheduler": {
+        "enable_prefix_caching": false,
+        "mamba_cache_mode": "none",
+        "enable_chunked_prefill": true,
+        "max_num_batched_tokens": 2048
+      },
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    }
+  ],
+  "serial_kernel_control": {
+    "scope": "One engine, identical tokens, weights and concurrency1; three warmed passes each of FlashInfer, Triton and restored FlashInfer. Only GDN prefill is switched; decode and other kernels remain unchanged.",
+    "all_within_mode_bitwise_repeatable": true,
+    "flashinfer_restoration_bitwise_equal": true,
+    "controls": {
+      "switched": [
+        {
+          "rank": 0,
+          "triton_layers": 30
+        },
+        {
+          "rank": 1,
+          "triton_layers": 30
+        },
+        {
+          "rank": 2,
+          "triton_layers": 30
+        },
+        {
+          "rank": 3,
+          "triton_layers": 30
+        },
+        {
+          "rank": 4,
+          "triton_layers": 30
+        },
+        {
+          "rank": 5,
+          "triton_layers": 30
+        },
+        {
+          "rank": 6,
+          "triton_layers": 30
+        },
+        {
+          "rank": 7,
+          "triton_layers": 30
+        }
+      ],
+      "restored": [
+        {
+          "rank": 0,
+          "restored_layers": 30,
+          "triton_calls": {
+            "language_model.model.layers.0.linear_attn": 144,
+            "language_model.model.layers.1.linear_attn": 144,
+            "language_model.model.layers.2.linear_attn": 144,
+            "language_model.model.layers.4.linear_attn": 144,
+            "language_model.model.layers.5.linear_attn": 144,
+            "language_model.model.layers.6.linear_attn": 144,
+            "language_model.model.layers.8.linear_attn": 144,
+            "language_model.model.layers.9.linear_attn": 144,
+            "language_model.model.layers.10.linear_attn": 144,
+            "language_model.model.layers.12.linear_attn": 144,
+            "language_model.model.layers.13.linear_attn": 144,
+            "language_model.model.layers.14.linear_attn": 144,
+            "language_model.model.layers.16.linear_attn": 144,
+            "language_model.model.layers.17.linear_attn": 144,
+            "language_model.model.layers.18.linear_attn": 144,
+            "language_model.model.layers.20.linear_attn": 144,
+            "language_model.model.layers.21.linear_attn": 144,
+            "language_model.model.layers.22.linear_attn": 144,
+            "language_model.model.layers.24.linear_attn": 144,
+            "language_model.model.layers.25.linear_attn": 144,
+            "language_model.model.layers.26.linear_attn": 144,
+            "language_model.model.layers.28.linear_attn": 144,
+            "language_model.model.layers.29.linear_attn": 144,
+            "language_model.model.layers.30.linear_attn": 144,
+            "language_model.model.layers.32.linear_attn": 144,
+            "language_model.model.layers.33.linear_attn": 144,
+            "language_model.model.layers.34.linear_attn": 144,
+            "language_model.model.layers.36.linear_attn": 144,
+            "language_model.model.layers.37.linear_attn": 144,
+            "language_model.model.layers.38.linear_attn": 144
+          }
+        },
+        {
+          "rank": 1,
+          "restored_layers": 30,
+          "triton_calls": {
+            "language_model.model.layers.0.linear_attn": 144,
+            "language_model.model.layers.1.linear_attn": 144,
+            "language_model.model.layers.2.linear_attn": 144,
+            "language_model.model.layers.4.linear_attn": 144,
+            "language_model.model.layers.5.linear_attn": 144,
+            "language_model.model.layers.6.linear_attn": 144,
+            "language_model.model.layers.8.linear_attn": 144,
+            "language_model.model.layers.9.linear_attn": 144,
+            "language_model.model.layers.10.linear_attn": 144,
+            "language_model.model.layers.12.linear_attn": 144,
+            "language_model.model.layers.13.linear_attn": 144,
+            "language_model.model.layers.14.linear_attn": 144,
+            "language_model.model.layers.16.linear_attn": 144,
+            "language_model.model.layers.17.linear_attn": 144,
+            "language_model.model.layers.18.linear_attn": 144,
+            "language_model.model.layers.20.linear_attn": 144,
+            "language_model.model.layers.21.linear_attn": 144,
+            "language_model.model.layers.22.linear_attn": 144,
+            "language_model.model.layers.24.linear_attn": 144,
+            "language_model.model.layers.25.linear_attn": 144,
+            "language_model.model.layers.26.linear_attn": 144,
+            "language_model.model.layers.28.linear_attn": 144,
+            "language_model.model.layers.29.linear_attn": 144,
+            "language_model.model.layers.30.linear_attn": 144,
+            "language_model.model.layers.32.linear_attn": 144,
+            "language_model.model.layers.33.linear_attn": 144,
+            "language_model.model.layers.34.linear_attn": 144,
+            "language_model.model.layers.36.linear_attn": 144,
+            "language_model.model.layers.37.linear_attn": 144,
+            "language_model.model.layers.38.linear_attn": 144
+          }
+        },
+        {
+          "rank": 2,
+          "restored_layers": 30,
+          "triton_calls": {
+            "language_model.model.layers.0.linear_attn": 144,
+            "language_model.model.layers.1.linear_attn": 144,
+            "language_model.model.layers.2.linear_attn": 144,
+            "language_model.model.layers.4.linear_attn": 144,
+            "language_model.model.layers.5.linear_attn": 144,
+            "language_model.model.layers.6.linear_attn": 144,
+            "language_model.model.layers.8.linear_attn": 144,
+            "language_model.model.layers.9.linear_attn": 144,
+            "language_model.model.layers.10.linear_attn": 144,
+            "language_model.model.layers.12.linear_attn": 144,
+            "language_model.model.layers.13.linear_attn": 144,
+            "language_model.model.layers.14.linear_attn": 144,
+            "language_model.model.layers.16.linear_attn": 144,
+            "language_model.model.layers.17.linear_attn": 144,
+            "language_model.model.layers.18.linear_attn": 144,
+            "language_model.model.layers.20.linear_attn": 144,
+            "language_model.model.layers.21.linear_attn": 144,
+            "language_model.model.layers.22.linear_attn": 144,
+            "language_model.model.layers.24.linear_attn": 144,
+            "language_model.model.layers.25.linear_attn": 144,
+            "language_model.model.layers.26.linear_attn": 144,
+            "language_model.model.layers.28.linear_attn": 144,
+            "language_model.model.layers.29.linear_attn": 144,
+            "language_model.model.layers.30.linear_attn": 144,
+            "language_model.model.layers.32.linear_attn": 144,
+            "language_model.model.layers.33.linear_attn": 144,
+            "language_model.model.layers.34.linear_attn": 144,
+            "language_model.model.layers.36.linear_attn": 144,
+            "language_model.model.layers.37.linear_attn": 144,
+            "language_model.model.layers.38.linear_attn": 144
+          }
+        },
+        {
+          "rank": 3,
+          "restored_layers": 30,
+          "triton_calls": {
+            "language_model.model.layers.0.linear_attn": 144,
+            "language_model.model.layers.1.linear_attn": 144,
+            "language_model.model.layers.2.linear_attn": 144,
+            "language_model.model.layers.4.linear_attn": 144,
+            "language_model.model.layers.5.linear_attn": 144,
+            "language_model.model.layers.6.linear_attn": 144,
+            "language_model.model.layers.8.linear_attn": 144,
+            "language_model.model.layers.9.linear_attn": 144,
+            "language_model.model.layers.10.linear_attn": 144,
+            "language_model.model.layers.12.linear_attn": 144,
+            "language_model.model.layers.13.linear_attn": 144,
+            "language_model.model.layers.14.linear_attn": 144,
+            "language_model.model.layers.16.linear_attn": 144,
+            "language_model.model.layers.17.linear_attn": 144,
+            "language_model.model.layers.18.linear_attn": 144,
+            "language_model.model.layers.20.linear_attn": 144,
+            "language_model.model.layers.21.linear_attn": 144,
+            "language_model.model.layers.22.linear_attn": 144,
+            "language_model.model.layers.24.linear_attn": 144,
+            "language_model.model.layers.25.linear_attn": 144,
+            "language_model.model.layers.26.linear_attn": 144,
+            "language_model.model.layers.28.linear_attn": 144,
+            "language_model.model.layers.29.linear_attn": 144,
+            "language_model.model.layers.30.linear_attn": 144,
+            "language_model.model.layers.32.linear_attn": 144,
+            "language_model.model.layers.33.linear_attn": 144,
+            "language_model.model.layers.34.linear_attn": 144,
+            "language_model.model.layers.36.linear_attn": 144,
+            "language_model.model.layers.37.linear_attn": 144,
+            "language_model.model.layers.38.linear_attn": 144
+          }
+        },
+        {
+          "rank": 4,
+          "restored_layers": 30,
+          "triton_calls": {
+            "language_model.model.layers.0.linear_attn": 144,
+            "language_model.model.layers.1.linear_attn": 144,
+            "language_model.model.layers.2.linear_attn": 144,
+            "language_model.model.layers.4.linear_attn": 144,
+            "language_model.model.layers.5.linear_attn": 144,
+            "language_model.model.layers.6.linear_attn": 144,
+            "language_model.model.layers.8.linear_attn": 144,
+            "language_model.model.layers.9.linear_attn": 144,
+            "language_model.model.layers.10.linear_attn": 144,
+            "language_model.model.layers.12.linear_attn": 144,
+            "language_model.model.layers.13.linear_attn": 144,
+            "language_model.model.layers.14.linear_attn": 144,
+            "language_model.model.layers.16.linear_attn": 144,
+            "language_model.model.layers.17.linear_attn": 144,
+            "language_model.model.layers.18.linear_attn": 144,
+            "language_model.model.layers.20.linear_attn": 144,
+            "language_model.model.layers.21.linear_attn": 144,
+            "language_model.model.layers.22.linear_attn": 144,
+            "language_model.model.layers.24.linear_attn": 144,
+            "language_model.model.layers.25.linear_attn": 144,
+            "language_model.model.layers.26.linear_attn": 144,
+            "language_model.model.layers.28.linear_attn": 144,
+            "language_model.model.layers.29.linear_attn": 144,
+            "language_model.model.layers.30.linear_attn": 144,
+            "language_model.model.layers.32.linear_attn": 144,
+            "language_model.model.layers.33.linear_attn": 144,
+            "language_model.model.layers.34.linear_attn": 144,
+            "language_model.model.layers.36.linear_attn": 144,
+            "language_model.model.layers.37.linear_attn": 144,
+            "language_model.model.layers.38.linear_attn": 144
+          }
+        },
+        {
+          "rank": 5,
+          "restored_layers": 30,
+          "triton_calls": {
+            "language_model.model.layers.0.linear_attn": 144,
+            "language_model.model.layers.1.linear_attn": 144,
+            "language_model.model.layers.2.linear_attn": 144,
+            "language_model.model.layers.4.linear_attn": 144,
+            "language_model.model.layers.5.linear_attn": 144,
+            "language_model.model.layers.6.linear_attn": 144,
+            "language_model.model.layers.8.linear_attn": 144,
+            "language_model.model.layers.9.linear_attn": 144,
+            "language_model.model.layers.10.linear_attn": 144,
+            "language_model.model.layers.12.linear_attn": 144,
+            "language_model.model.layers.13.linear_attn": 144,
+            "language_model.model.layers.14.linear_attn": 144,
+            "language_model.model.layers.16.linear_attn": 144,
+            "language_model.model.layers.17.linear_attn": 144,
+            "language_model.model.layers.18.linear_attn": 144,
+            "language_model.model.layers.20.linear_attn": 144,
+            "language_model.model.layers.21.linear_attn": 144,
+            "language_model.model.layers.22.linear_attn": 144,
+            "language_model.model.layers.24.linear_attn": 144,
+            "language_model.model.layers.25.linear_attn": 144,
+            "language_model.model.layers.26.linear_attn": 144,
+            "language_model.model.layers.28.linear_attn": 144,
+            "language_model.model.layers.29.linear_attn": 144,
+            "language_model.model.layers.30.linear_attn": 144,
+            "language_model.model.layers.32.linear_attn": 144,
+            "language_model.model.layers.33.linear_attn": 144,
+            "language_model.model.layers.34.linear_attn": 144,
+            "language_model.model.layers.36.linear_attn": 144,
+            "language_model.model.layers.37.linear_attn": 144,
+            "language_model.model.layers.38.linear_attn": 144
+          }
+        },
+        {
+          "rank": 6,
+          "restored_layers": 30,
+          "triton_calls": {
+            "language_model.model.layers.0.linear_attn": 144,
+            "language_model.model.layers.1.linear_attn": 144,
+            "language_model.model.layers.2.linear_attn": 144,
+            "language_model.model.layers.4.linear_attn": 144,
+            "language_model.model.layers.5.linear_attn": 144,
+            "language_model.model.layers.6.linear_attn": 144,
+            "language_model.model.layers.8.linear_attn": 144,
+            "language_model.model.layers.9.linear_attn": 144,
+            "language_model.model.layers.10.linear_attn": 144,
+            "language_model.model.layers.12.linear_attn": 144,
+            "language_model.model.layers.13.linear_attn": 144,
+            "language_model.model.layers.14.linear_attn": 144,
+            "language_model.model.layers.16.linear_attn": 144,
+            "language_model.model.layers.17.linear_attn": 144,
+            "language_model.model.layers.18.linear_attn": 144,
+            "language_model.model.layers.20.linear_attn": 144,
+            "language_model.model.layers.21.linear_attn": 144,
+            "language_model.model.layers.22.linear_attn": 144,
+            "language_model.model.layers.24.linear_attn": 144,
+            "language_model.model.layers.25.linear_attn": 144,
+            "language_model.model.layers.26.linear_attn": 144,
+            "language_model.model.layers.28.linear_attn": 144,
+            "language_model.model.layers.29.linear_attn": 144,
+            "language_model.model.layers.30.linear_attn": 144,
+            "language_model.model.layers.32.linear_attn": 144,
+            "language_model.model.layers.33.linear_attn": 144,
+            "language_model.model.layers.34.linear_attn": 144,
+            "language_model.model.layers.36.linear_attn": 144,
+            "language_model.model.layers.37.linear_attn": 144,
+            "language_model.model.layers.38.linear_attn": 144
+          }
+        },
+        {
+          "rank": 7,
+          "restored_layers": 30,
+          "triton_calls": {
+            "language_model.model.layers.0.linear_attn": 144,
+            "language_model.model.layers.1.linear_attn": 144,
+            "language_model.model.layers.2.linear_attn": 144,
+            "language_model.model.layers.4.linear_attn": 144,
+            "language_model.model.layers.5.linear_attn": 144,
+            "language_model.model.layers.6.linear_attn": 144,
+            "language_model.model.layers.8.linear_attn": 144,
+            "language_model.model.layers.9.linear_attn": 144,
+            "language_model.model.layers.10.linear_attn": 144,
+            "language_model.model.layers.12.linear_attn": 144,
+            "language_model.model.layers.13.linear_attn": 144,
+            "language_model.model.layers.14.linear_attn": 144,
+            "language_model.model.layers.16.linear_attn": 144,
+            "language_model.model.layers.17.linear_attn": 144,
+            "language_model.model.layers.18.linear_attn": 144,
+            "language_model.model.layers.20.linear_attn": 144,
+            "language_model.model.layers.21.linear_attn": 144,
+            "language_model.model.layers.22.linear_attn": 144,
+            "language_model.model.layers.24.linear_attn": 144,
+            "language_model.model.layers.25.linear_attn": 144,
+            "language_model.model.layers.26.linear_attn": 144,
+            "language_model.model.layers.28.linear_attn": 144,
+            "language_model.model.layers.29.linear_attn": 144,
+            "language_model.model.layers.30.linear_attn": 144,
+            "language_model.model.layers.32.linear_attn": 144,
+            "language_model.model.layers.33.linear_attn": 144,
+            "language_model.model.layers.34.linear_attn": 144,
+            "language_model.model.layers.36.linear_attn": 144,
+            "language_model.model.layers.37.linear_attn": 144,
+            "language_model.model.layers.38.linear_attn": 144
+          }
+        }
+      ],
+      "triton_profile": [
+        {
+          "rank": 0,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "triton"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        },
+        {
+          "rank": 1,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "triton"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        },
+        {
+          "rank": 2,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "triton"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        },
+        {
+          "rank": 3,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "triton"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        },
+        {
+          "rank": 4,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "triton"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        },
+        {
+          "rank": 5,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "triton"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        },
+        {
+          "rank": 6,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "triton"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        },
+        {
+          "rank": 7,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "triton"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        }
+      ],
+      "restored_profile": [
+        {
+          "rank": 0,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "flashinfer"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        },
+        {
+          "rank": 1,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "flashinfer"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        },
+        {
+          "rank": 2,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "flashinfer"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        },
+        {
+          "rank": 3,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "flashinfer"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        },
+        {
+          "rank": 4,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "flashinfer"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        },
+        {
+          "rank": 5,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "flashinfer"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        },
+        {
+          "rank": 6,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "flashinfer"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        },
+        {
+          "rank": 7,
+          "cache_scheduler": {
+            "enable_prefix_caching": false,
+            "mamba_cache_mode": "none",
+            "enable_chunked_prefill": true,
+            "max_num_batched_tokens": 2048
+          },
+          "model_training": false,
+          "active_dropout_modules": [],
+          "layers": 30,
+          "prefill_backends": [
+            "flashinfer"
+          ],
+          "decode_kernels": [
+            "cuda"
+          ],
+          "ssm_cache_dtypes": [
+            "torch.float32"
+          ],
+          "conv_cache_dtypes": [
+            "torch.bfloat16"
+          ],
+          "a_log_dtypes": [
+            "torch.float32"
+          ]
+        }
+      ]
+    }
+  },
+  "prefix_cache_disabled_vs_original_same_tokens": {
+    "reference": {
+      "source": "/lustre/fsw/portfolios/coreai/users/yuekaiz/single_controller/RL-pr4963/validation/kl_diagnosis/results/21384522",
+      "checkpoint_step": 600,
+      "control": "prefix_cache_disabled"
+    },
+    "initial_refit_hf_tensors_sampled_exact_match": 1026,
+    "scope": "Prefix cache disabled, unchanged2048 chunk budget; prompt-logprob requests already skip cache reads. This changes cache management and GDN alignment, not only prefix reuse.",
+    "matched_serial_kernel_pairs": {
+      "flashinfer_serial1": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.001127047689171088,
+          "reverse_mean_k3": 0.001141092921035951,
+          "rms_logprob_delta": 0.04734817117710603,
+          "max_abs_delta": 1.0196805000305176,
+          "nonidentical_fraction": 0.637244389982385
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.001127047689171088,
+          "reverse_mean_k3": 0.001141092921035951,
+          "rms_logprob_delta": 0.04734817117710603,
+          "max_abs_delta": 1.0196805000305176,
+          "nonidentical_fraction": 0.637244389982385
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.001127047689171088,
+          "reverse_mean_k3": 0.001141092921035951,
+          "rms_logprob_delta": 0.04734817117710603,
+          "max_abs_delta": 1.0196805000305176,
+          "nonidentical_fraction": 0.637244389982385
+        }
+      ],
+      "triton_serial1": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0020987348174825444,
+          "reverse_mean_k3": 0.0020540981750068856,
+          "rms_logprob_delta": 0.06402416820036384,
+          "max_abs_delta": 1.0195369720458984,
+          "nonidentical_fraction": 0.8748181052309106
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0020987348174825444,
+          "reverse_mean_k3": 0.0020540981750068856,
+          "rms_logprob_delta": 0.06402416820036384,
+          "max_abs_delta": 1.0195369720458984,
+          "nonidentical_fraction": 0.8748181052309106
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0020987348174825444,
+          "reverse_mean_k3": 0.0020540981750068856,
+          "rms_logprob_delta": 0.06402416820036384,
+          "max_abs_delta": 1.0195369720458984,
+          "nonidentical_fraction": 0.8748181052309106
+        }
+      ],
+      "flashinfer_restored_serial1": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.001127047689171088,
+          "reverse_mean_k3": 0.001141092921035951,
+          "rms_logprob_delta": 0.04734817117710603,
+          "max_abs_delta": 1.0196805000305176,
+          "nonidentical_fraction": 0.637244389982385
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.001127047689171088,
+          "reverse_mean_k3": 0.001141092921035951,
+          "rms_logprob_delta": 0.04734817117710603,
+          "max_abs_delta": 1.0196805000305176,
+          "nonidentical_fraction": 0.637244389982385
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.001127047689171088,
+          "reverse_mean_k3": 0.001141092921035951,
+          "rms_logprob_delta": 0.04734817117710603,
+          "max_abs_delta": 1.0196805000305176,
+          "nonidentical_fraction": 0.637244389982385
+        }
+      ]
+    }
+  },
+  "job": {
+    "id": 21392111,
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed": "00:13:13",
+    "scope": "Two real updates600 to602, same-engine serial GDN prefill A/B/restored-A"
+  },
+  "native_train_metrics": [
+    {
+      "nemo_rl/step": 601,
+      "gen_kl_error": 0.002143244853868964,
+      "policy_kl_error": 0.002414199927898153,
+      "weight_version_lag": 0,
+      "lr": 1e-06,
+      "num_valid_samples": 32.0,
+      "dropped_prompt_groups": 0,
+      "num_masked_seqs_by_logprob_error": 0,
+      "reward": 0.875,
+      "mean_gen_tokens_per_sample": 771.5,
+      "loss": 0.0,
+      "approx_entropy": 0.28012048499658704
+    },
+    {
+      "nemo_rl/step": 602,
+      "gen_kl_error": 0.0018699719539654325,
+      "policy_kl_error": 0.001968230409147509,
+      "weight_version_lag": 1,
+      "lr": 1e-06,
+      "num_valid_samples": 32.0,
+      "dropped_prompt_groups": 0,
+      "num_masked_seqs_by_logprob_error": 0,
+      "reward": 0.96875,
+      "mean_gen_tokens_per_sample": 762.75,
+      "loss": -0.007750550284981728,
+      "approx_entropy": 0.21252075000666082
+    }
+  ],
+  "interpretation": {
+    "controlled_prefill_choice_changes_full_model_logprobs": true,
+    "swapping_to_triton_does_not_reduce_policy_gap": true,
+    "caveat": "Changing only GDN prefill reproducibly changes full-model scores, but this does not establish which implementation is inaccurate or make the entire gen_kl_error attributable to that layer. Shared-input single-layer replay with a mathematical reference is pending."
+  }
+}

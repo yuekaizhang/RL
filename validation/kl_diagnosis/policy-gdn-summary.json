@@ -1,0 +1,411 @@
+{
+  "job": {
+    "id": 21398928,
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed": "00:03:39"
+  },
+  "source_capture_job": 21392111,
+  "policy": {
+    "status": "completed",
+    "scope": "AutoModel's resolved GDN primitive on one captured pre-normalized segment; not a full-layer/model parity test. BF16 beta is a source-motivated counterfactual, not a capture of the policy's projected gates.",
+    "source": "validation/kl_diagnosis/results/21392111/gdn-prefill-inputs.pt",
+    "tokens": 677,
+    "primitive_module": "fla.ops.gated_delta_rule.chunk",
+    "primitive_name": "chunk_gated_delta_rule",
+    "layer_class_source": "/lustre/fsw/portfolios/coreai/users/yuekaiz/single_controller/RL-pr4963/3rdparty/Automodel-workspace/Automodel/nemo_automodel/components/models/qwen3_5_moe/cp_linear_attn.py",
+    "cpu_fp32_vs_fp64_output": {
+      "rms_delta": 9.279171880245786e-09,
+      "relative_rms_delta": 1.5452100282087063e-07,
+      "max_abs_delta": 6.102908403082807e-07,
+      "nonidentical_fraction": 1.0
+    },
+    "cpu_fp32_vs_fp64_state": {
+      "rms_delta": 1.0788927026177906e-07,
+      "relative_rms_delta": 6.165420126740477e-07,
+      "max_abs_delta": 1.0700056233048372e-05,
+      "nonidentical_fraction": 0.95703125
+    },
+    "reported_wrapper_source": "/opt/ray_venvs/nemo_rl.models.policy.workers.automodel_policy_worker.AutomodelPolicyWorker/lib/python3.13/site-packages/torch/_dynamo/eval_frame.py",
+    "state_contract": "The resolved FLA API documents final_state [N,HV,K,V]; transpose the last dimensions before comparing with the pinned vLLM V,K reference.",
+    "cases": {
+      "shared_beta_fp32": {
+        "repeat_output": [
+          {
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          },
+          {
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          }
+        ],
+        "repeat_state": [
+          {
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          },
+          {
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          }
+        ],
+        "output_vs_cpu_fp64": {
+          "rms_delta": 0.00011963240700480105,
+          "relative_rms_delta": 0.0019921734114668388,
+          "max_abs_delta": 0.005061764179543404,
+          "nonidentical_fraction": 1.0
+        },
+        "state_shape": [
+          1,
+          4,
+          128,
+          128
+        ],
+        "state_dtypes": "torch.float32",
+        "state_vs_cpu_fp64_after_contract_transpose": {
+          "rms_delta": 0.0003935137466571375,
+          "relative_rms_delta": 0.0022487663211570247,
+          "max_abs_delta": 0.01628879246993109,
+          "nonidentical_fraction": 0.95703125
+        }
+      },
+      "beta_bf16": {
+        "repeat_output": [
+          {
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          },
+          {
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          }
+        ],
+        "repeat_state": [
+          {
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          },
+          {
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          }
+        ],
+        "output_vs_cpu_fp64": {
+          "rms_delta": 0.00011685922440928102,
+          "relative_rms_delta": 0.0019459931099059424,
+          "max_abs_delta": 0.0054348842656466445,
+          "nonidentical_fraction": 1.0
+        },
+        "state_shape": [
+          1,
+          4,
+          128,
+          128
+        ],
+        "state_dtypes": "torch.float32",
+        "state_vs_cpu_fp64_after_contract_transpose": {
+          "rms_delta": 0.0004884459765570136,
+          "relative_rms_delta": 0.0027912642725111346,
+          "max_abs_delta": 0.023060084114046475,
+          "nonidentical_fraction": 0.95703125
+        }
+      }
+    }
+  },
+  "generation": {
+    "status": "completed",
+    "scope": "One actual captured GDN layer/segment, at most1024 tokens; compares kernel output and state, not full-model KL or CUDA decode correctness. FP64 reference uses identical captured inputs and shared BF16-normalized q/k with the sequential delta rule.",
+    "layer": "language_model.model.layers.0.linear_attn",
+    "source_capture": "validation/kl_diagnosis/results/21392111/gdn-prefill-inputs.pt",
+    "sequence_index": 0,
+    "segment_tokens": 677,
+    "replayed_tokens": 677,
+    "input_shapes": {
+      "q": [
+        1,
+        677,
+        2,
+        128
+      ],
+      "k": [
+        1,
+        677,
+        2,
+        128
+      ],
+      "v": [
+        1,
+        677,
+        4,
+        128
+      ],
+      "g": [
+        1,
+        677,
+        4
+      ],
+      "beta": [
+        1,
+        677,
+        4
+      ]
+    },
+    "input_dtypes": {
+      "q": "torch.bfloat16",
+      "k": "torch.bfloat16",
+      "v": "torch.bfloat16",
+      "g": "torch.float32",
+      "beta": "torch.float32"
+    },
+    "initial_state_dtype": "torch.float32",
+    "initial_state_max_abs": 0.0,
+    "qk_normalize_in_captured_call": false,
+    "gpu": "NVIDIA H100 80GB HBM3",
+    "torch_version": "2.13.0+cu130",
+    "original_paths": {
+      "flashinfer": {
+        "repeat_output": [
+          {
+            "elements": 346624,
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          },
+          {
+            "elements": 346624,
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          }
+        ],
+        "repeat_state": [
+          {
+            "elements": 65536,
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          },
+          {
+            "elements": 65536,
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          }
+        ]
+      },
+      "triton": {
+        "repeat_output": [
+          {
+            "elements": 346624,
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          },
+          {
+            "elements": 346624,
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          }
+        ],
+        "repeat_state": [
+          {
+            "elements": 65536,
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          },
+          {
+            "elements": 65536,
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          }
+        ]
+      }
+    },
+    "flashinfer_vs_triton_original": {
+      "output": {
+        "elements": 346624,
+        "rms_delta": 0.0001387176251783456,
+        "relative_rms_delta": 0.0023097844697766864,
+        "max_abs_delta": 0.0078125,
+        "nonidentical_fraction": 0.41581367706794686
+      },
+      "state": {
+        "elements": 65536,
+        "rms_delta": 0.0005004460379586428,
+        "relative_rms_delta": 0.0028600519414453585,
+        "max_abs_delta": 0.018474698066711426,
+        "nonidentical_fraction": 0.8813323974609375
+      }
+    },
+    "shared_normalization": {
+      "flashinfer": {
+        "output_vs_fp64": {
+          "elements": 346624,
+          "rms_delta": 0.00011066179866390564,
+          "relative_rms_delta": 0.0018427907494537163,
+          "max_abs_delta": 0.005061764179542738,
+          "nonidentical_fraction": 1.0
+        },
+        "state_vs_fp64": {
+          "elements": 65536,
+          "rms_delta": 0.0003104785026687283,
+          "relative_rms_delta": 0.0017742546637208657,
+          "max_abs_delta": 0.011922845848643338,
+          "nonidentical_fraction": 0.95703125
+        },
+        "output_vs_original": {
+          "elements": 346624,
+          "rms_delta": 0.0,
+          "relative_rms_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        }
+      },
+      "triton": {
+        "output_vs_fp64": {
+          "elements": 346624,
+          "rms_delta": 0.00011792332557046209,
+          "relative_rms_delta": 0.0019637130078290093,
+          "max_abs_delta": 0.005061764179542738,
+          "nonidentical_fraction": 1.0
+        },
+        "state_vs_fp64": {
+          "elements": 65536,
+          "rms_delta": 0.0004029081583473904,
+          "relative_rms_delta": 0.0023024514510809123,
+          "max_abs_delta": 0.017075931408835232,
+          "nonidentical_fraction": 0.95703125
+        },
+        "output_vs_original": {
+          "elements": 346624,
+          "rms_delta": 0.0,
+          "relative_rms_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        }
+      },
+      "recurrent_fp32": {
+        "output_vs_fp64": {
+          "elements": 346624,
+          "rms_delta": 9.542316618893052e-05,
+          "relative_rms_delta": 0.0015890300904163853,
+          "max_abs_delta": 0.0038885202275396047,
+          "nonidentical_fraction": 1.0
+        },
+        "state_vs_fp64": {
+          "elements": 65536,
+          "rms_delta": 3.89608959672214e-07,
+          "relative_rms_delta": 2.2264520982421153e-06,
+          "max_abs_delta": 4.8224965564225286e-05,
+          "nonidentical_fraction": 0.95703125
+        }
+      }
+    },
+    "reference_output_rounding_floor": {
+      "elements": 346624,
+      "rms_delta": 9.542315341647759e-05,
+      "relative_rms_delta": 0.0015890298777236729,
+      "max_abs_delta": 0.0038885202275396047,
+      "nonidentical_fraction": 1.0
+    },
+    "policy_primitive_parity": {
+      "scope": "Exact shared q/k/v/g/beta input values across policy and generation environments; q/k heads explicitly expanded as in AutoModel. BF16 beta is a separate counterfactual.",
+      "gpu_fp64_vs_cpu_fp64_output": {
+        "elements": 346624,
+        "rms_delta": 1.778845345263317e-17,
+        "relative_rms_delta": 2.962214410517471e-16,
+        "max_abs_delta": 8.881784197001252e-16,
+        "nonidentical_fraction": 0.7791353166543574
+      },
+      "gpu_fp64_vs_cpu_fp64_state": {
+        "elements": 65536,
+        "rms_delta": 1.160790148219128e-16,
+        "relative_rms_delta": 6.633429742723577e-16,
+        "max_abs_delta": 9.325873406851315e-15,
+        "nonidentical_fraction": 0.687042236328125
+      },
+      "kernels": {
+        "flashinfer": {
+          "expanded_heads_vs_original_output": {
+            "elements": 346624,
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          },
+          "vs_policy_shared_beta_fp32_output": {
+            "elements": 346624,
+            "rms_delta": 0.00014609605940831024,
+            "relative_rms_delta": 0.002433007527974175,
+            "max_abs_delta": 0.0078125,
+            "nonidentical_fraction": 0.4166185838257016
+          },
+          "vs_policy_beta_bf16_output": {
+            "elements": 346624,
+            "rms_delta": 0.00014859787978380016,
+            "relative_rms_delta": 0.002474525250754115,
+            "max_abs_delta": 0.0078125,
+            "nonidentical_fraction": 0.40754535173559825
+          }
+        },
+        "triton": {
+          "expanded_heads_vs_original_output": {
+            "elements": 346624,
+            "rms_delta": 0.0,
+            "relative_rms_delta": 0.0,
+            "max_abs_delta": 0.0,
+            "nonidentical_fraction": 0.0
+          },
+          "vs_policy_shared_beta_fp32_output": {
+            "elements": 346624,
+            "rms_delta": 8.872571444799679e-05,
+            "relative_rms_delta": 0.0014775917437550273,
+            "max_abs_delta": 0.0078125,
+            "nonidentical_fraction": 0.1964549483013294
+          },
+          "vs_policy_beta_bf16_output": {
+            "elements": 346624,
+            "rms_delta": 0.00014676447521317962,
+            "relative_rms_delta": 0.002443994492768542,
+            "max_abs_delta": 0.0078125,
+            "nonidentical_fraction": 0.330049275295421
+          }
+        }
+      }
+    }
+  },
+  "interpretation": {
+    "shared_input_backend_primitive_difference_verified": true,
+    "head_expansion_is_bitwise_equal_in_this_capture": true,
+    "beta_bf16_is_only_counterfactual": true,
+    "caveat": "A single pre-normalized captured segment does not establish full-layer parity, a complete gen_kl_error decomposition or a production bug/fix. Actual projected policy q/k/g/beta are not captured by this test."
+  }
+}
