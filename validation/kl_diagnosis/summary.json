@@ -1,0 +1,212 @@
+{
+  "status": "completed",
+  "scope": "AutoModel checkpoint600, EP16, configured LA0, two real updates; recovered batches have lag0 then lag1. Sampled refit payloads, not exhaustive resident mapping proof.",
+  "train_eval_same_version": {
+    "tokens": 51476,
+    "mean_logprob_delta": 0.0,
+    "rms_logprob_delta": 0.0,
+    "max_abs_delta": 0.0,
+    "mean_k3": 0.0,
+    "reverse_mean_k3": 0.0
+  },
+  "generation_policy_mixed_lag0_lag1": {
+    "tokens": 51476,
+    "mean_logprob_delta": -0.002264249059964339,
+    "rms_logprob_delta": 0.06686144543703387,
+    "max_abs_delta": 2.2078888416290283,
+    "mean_k3": 0.002182951733716729,
+    "reverse_mean_k3": 0.0024325533973499247
+  },
+  "policy_single_update_same_tokens": {
+    "tokens": 51476,
+    "mean_logprob_delta": -0.0012871482758695489,
+    "rms_logprob_delta": 0.07399044059557021,
+    "max_abs_delta": 3.177929639816284,
+    "mean_k3": 0.003022394786847137,
+    "reverse_mean_k3": 0.0028286115998196514
+  },
+  "refit_transport": [
+    {
+      "refit": 0,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    },
+    {
+      "refit": 1,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    },
+    {
+      "refit": 2,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    }
+  ],
+  "admission": [
+    {
+      "step": 600,
+      "trainer_version": 600,
+      "rollout_versions": [
+        600
+      ],
+      "lag": [
+        0
+      ],
+      "unique_samples": 32
+    },
+    {
+      "step": 601,
+      "trainer_version": 601,
+      "rollout_versions": [
+        600
+      ],
+      "lag": [
+        1
+      ],
+      "unique_samples": 32
+    }
+  ],
+  "per_step": {
+    "600": {
+      "train_eval": {
+        "tokens": 27586,
+        "mean_logprob_delta": 0.0,
+        "rms_logprob_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "mean_k3": 0.0,
+        "reverse_mean_k3": 0.0
+      },
+      "generation_policy": {
+        "tokens": 27586,
+        "mean_logprob_delta": -0.001989830987881713,
+        "rms_logprob_delta": 0.0651434152815876,
+        "max_abs_delta": 2.2078888416290283,
+        "mean_k3": 0.002058932194693823,
+        "reverse_mean_k3": 0.002331947076917627
+      },
+      "drift": {
+        "tokens": 27586,
+        "mean_logprob_delta": -0.0019033595779002284,
+        "rms_logprob_delta": 0.07538365509268696,
+        "max_abs_delta": 3.177929639816284,
+        "mean_k3": 0.0033453320072903024,
+        "reverse_mean_k3": 0.0029159988280312342
+      }
+    },
+    "601": {
+      "train_eval": {
+        "tokens": 23890,
+        "mean_logprob_delta": 0.0,
+        "rms_logprob_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "mean_k3": 0.0,
+        "reverse_mean_k3": 0.0
+      },
+      "generation_policy": {
+        "tokens": 23890,
+        "mean_logprob_delta": -0.0025811221004193963,
+        "rms_logprob_delta": 0.06879191400273822,
+        "max_abs_delta": 1.6469223499298096,
+        "mean_k3": 0.002326158221932966,
+        "reverse_mean_k3": 0.0025487244293903332
+      },
+      "drift": {
+        "tokens": 23890,
+        "mean_logprob_delta": -0.000575603488183558,
+        "rms_logprob_delta": 0.07234831451057465,
+        "max_abs_delta": 1.6207704544067383,
+        "mean_k3": 0.0026494962450662593,
+        "reverse_mean_k3": 0.0027277047736394633
+      }
+    }
+  },
+  "a_log_fp32_same_tokens_same_policy": {
+    "original_refit_prefill_vs_policy": {
+      "tokens": 27586,
+      "mean_logprob_delta": 0.00033671829374371876,
+      "rms_logprob_delta": 0.06913282587292525,
+      "max_abs_delta": 1.9960930347442627,
+      "mean_k3": 0.002452038956039352,
+      "reverse_mean_k3": 0.0024987262917858756
+    },
+    "fp32_a_log_prefill_vs_policy": {
+      "tokens": 27586,
+      "mean_logprob_delta": 0.0002491027506896681,
+      "rms_logprob_delta": 0.06726886445755417,
+      "max_abs_delta": 2.6940369606018066,
+      "mean_k3": 0.0022403659950493244,
+      "reverse_mean_k3": 0.002549399033775174
+    },
+    "original_prefill_vs_original_decode": {
+      "tokens": 27586,
+      "mean_logprob_delta": -0.0023265492818790937,
+      "rms_logprob_delta": 0.06484384369010932,
+      "max_abs_delta": 1.6571569442749023,
+      "mean_k3": 0.002058434351111356,
+      "reverse_mean_k3": 0.002229164121710241
+    },
+    "changes": [
+      {
+        "patched": 30,
+        "rank": 0
+      },
+      {
+        "patched": 30,
+        "rank": 1
+      },
+      {
+        "patched": 30,
+        "rank": 2
+      },
+      {
+        "patched": 30,
+        "rank": 3
+      },
+      {
+        "patched": 30,
+        "rank": 4
+      },
+      {
+        "patched": 30,
+        "rank": 5
+      },
+      {
+        "patched": 30,
+        "rank": 6
+      },
+      {
+        "patched": 30,
+        "rank": 7
+      }
+    ],
+    "restored": [
+      {
+        "restored": 30
+      },
+      {
+        "restored": 30
+      },
+      {
+        "restored": 30
+      },
+      {
+        "restored": 30
+      },
+      {
+        "restored": 30
+      },
+      {
+        "restored": 30
+      },
+      {
+        "restored": 30
+      },
+      {
+        "restored": 30
+      }
+    ]
+  }
+}
