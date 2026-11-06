@@ -1,0 +1,65 @@
+{
+  "status": "passed",
+  "job": 21388461,
+  "slurm_state": "COMPLETED",
+  "exit_code": "0:0",
+  "elapsed": "00:03:18",
+  "scope": "Real config composition, GDN backend selection, both MCore exact-source-file entry imports and checkpoint discovery; no full models or training",
+  "automodel_recipe": {
+    "status": "passed",
+    "config": "validation/kl_diagnosis/ep16_noprefix.yaml",
+    "scope": "Real config inheritance, Hydra overrides, MasterConfig and SC validation; no actors/model loading",
+    "vllm_kwargs": {
+      "enable_prefix_caching": false,
+      "max_num_batched_tokens": 2048,
+      "mamba_cache_dtype": "bfloat16",
+      "mamba_ssm_cache_dtype": "float32"
+    }
+  },
+  "generation_controls": {
+    "status": "passed",
+    "scope": "Pinned backend selector, scoring defaults and cache/scheduler config; actual runtime is checked again on all eight workers",
+    "gdn_backend": "GDN_ATTN",
+    "batch_invariance_supported": false,
+    "prompt_logprobs_skip_prefix_reads": true,
+    "enable_prefix_caching": false,
+    "ssm_dtype": "float32",
+    "conv_dtype": "bfloat16",
+    "chunk_budget": 2048
+  },
+  "mcore_cases": {
+    "0": {
+      "preflight_only": true,
+      "lookahead": 0,
+      "resume_step": 300,
+      "checkpoint": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_nemorl/users/yuekaiz/single_controller/RL-pr4963/validation/mcore/results/yuekaiz-mcore-la0-300/checkpoints/step_300",
+      "destination": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_nemorl/users/yuekaiz/single_controller/RL-pr4963/validation/mcore/results/yuekaiz-mcore-la0-600/checkpoints",
+      "target_steps": 600,
+      "slurm_job": "21388461",
+      "wandb_id": "yuekaiz4963mc0s42",
+      "config": "validation/mcore/la0_to600.yaml",
+      "logprob_chunk_size": 512,
+      "restore_saved_scheduler": true
+    },
+    "1": {
+      "preflight_only": true,
+      "lookahead": 1,
+      "resume_step": 300,
+      "checkpoint": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_nemorl/users/yuekaiz/single_controller/RL-pr4963/validation/mcore/results/yuekaiz-mcore-la1-300/checkpoints/step_300",
+      "destination": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_nemorl/users/yuekaiz/single_controller/RL-pr4963/validation/mcore/results/yuekaiz-mcore-la1-600/checkpoints",
+      "target_steps": 600,
+      "slurm_job": "21388461",
+      "wandb_id": "yuekaiz4963mc1s42",
+      "config": "validation/mcore/la1_to600.yaml",
+      "logprob_chunk_size": 512,
+      "restore_saved_scheduler": true
+    }
+  },
+  "next_jobs": {
+    "automodel_fixed_token": 21388465,
+    "mcore_la0_first": 21388471,
+    "mcore_la1_first": 21388475
+  },
+  "full_model_resume_verified": false,
+  "new_fixed_token_result_available": false
+}

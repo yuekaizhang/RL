@@ -1,6 +1,6 @@
 # AutoModel checkpoint600 固定 token KL 排查
 
-2026-11-06 03:52 更新：**相同权重、相同 token 下，串行评分三次逐位一致，
+2026-11-06 05:50 更新：**相同权重、相同 token 下，串行评分三次逐位一致，
 4并发与32并发时出现明显重复差异。** 因此，生成端差异至少有一部分依赖
 请求调度、batch形状或缓存管理条件，不能全部解释为 LA1 策略滞后。
 不过，稳定的串行评分与同version600的policy仍有约0.00216的K3差异，
@@ -46,12 +46,24 @@ step602 genKL0.0020259171/lag1；两步LR均1e-6、有效样本均32。
 `skip_reading_prefix_cache=True`。因此上一轮差异不能解释为直接读取了缓存
 中的共享prefix；但开启prefix cache仍会影响GDN状态的管理和分块边界。
 
-下一轮 `21385590` 已提交：只关闭prefix cache，复用21384522的完全相同
-32条token和policy logprob、同checkpoint600，chunk预算仍2048；显式固定
-SSM/conv cache为上一轮实际FP32/BF16。继续串行/4并发/32并发各三次评分，
-核对跨作业初始refit抽样相同，并完成两次真实更新及三次refit检查。
-启动前增加GDN backend selector、cache/scheduler及prompt-logprob默认行为
-预检；实际八个worker还需报告控制配置确已生效。目前尚待GPU结果。
+关闭prefix cache的 `21385590` 在模型加载前因新增Hydra配置键的写法错误
+退出，耗时3分16秒。GDN selector及cache/scheduler预检已通过，但没有评分、
+训练更新或refit结果。已将四个新键写进独立`ep16_noprefix.yaml`，并增加
+真实Hydra继承、CLI覆盖、MasterConfig和SC配置校验。
+
+恢复预检 `21388461` 使用原1030镜像、1GPU，**COMPLETED/exit0，耗时3分18秒**。
+实际通过上述诊断配置校验、GDN selector、prompt-logprob默认行为及cache
+配置检查；同时验证MCore两组续跑入口、checkpoint300及optimizer状态发现。
+MCore此前两个首段因Megatron同名`examples`包抢占导入而退出，现改为按
+确切源文件路径加载，预检已验证两组入口。以上均未加载完整模型或执行训练。
+机器证据见 [recovery-preflight-summary.json](recovery-preflight-summary.json)。
+
+新的固定token对照 **21388465** 已接续：关闭prefix cache，复用21384522的
+完全相同32条token、policy logprob和checkpoint600；chunk预算2048、SSM/conv
+cache实际精度FP32/BF16保持一致。继续三种并发量各三次评分、两次真实更新
+及三次refit检查，八个worker运行时配置也必须核对。预检通过后已解除依赖，
+当前Priority排队，尚无新KL结果。MCore600两组新首段为21388471／21388475，
+同样通过预检门控后排队；仍需在实际恢复后验证第301步及保存的scheduler。
 
 现有`vllm_cfg.fp32_lm_head`实现只支持Nemotron-H，不能直接用于当前Qwen；
 AutoModel当前路径实际生成完整logits，并非已启用fused linear CE。
