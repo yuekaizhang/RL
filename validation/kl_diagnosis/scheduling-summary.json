@@ -1,0 +1,455 @@
+{
+  "status": "completed",
+  "scope": "Checkpoint600, unchanged FP32-A_log model, identical tokens; concurrency changes request scheduling, batch shapes and possible prefix-cache reuse together, not an isolated GEMM-kernel test.",
+  "within_mode": {
+    "serial1": {
+      "repeat_pairs": {
+        "0-1": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "0-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "1-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        }
+      },
+      "policy_comparisons": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0021621993945321522,
+          "reverse_mean_k3": 0.002104469233707462,
+          "rms_logprob_delta": 0.06488047150222823,
+          "max_abs_delta": 0.9929585456848145,
+          "nonidentical_fraction": 0.8868806004442061
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0021621993945321522,
+          "reverse_mean_k3": 0.002104469233707462,
+          "rms_logprob_delta": 0.06488047150222823,
+          "max_abs_delta": 0.9929585456848145,
+          "nonidentical_fraction": 0.8868806004442061
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0021621993945321522,
+          "reverse_mean_k3": 0.002104469233707462,
+          "rms_logprob_delta": 0.06488047150222823,
+          "max_abs_delta": 0.9929585456848145,
+          "nonidentical_fraction": 0.8868806004442061
+        }
+      ]
+    },
+    "microbatch4": {
+      "repeat_pairs": {
+        "0-1": {
+          "tokens": 26114,
+          "mean_k3": 0.000702376141122489,
+          "reverse_mean_k3": 0.0007097580470062374,
+          "rms_logprob_delta": 0.03733333702493552,
+          "max_abs_delta": 1.0650907754898071,
+          "nonidentical_fraction": 0.4012024201577698
+        },
+        "0-2": {
+          "tokens": 26114,
+          "mean_k3": 0.001277138518945888,
+          "reverse_mean_k3": 0.0012549724650005624,
+          "rms_logprob_delta": 0.04985303318729915,
+          "max_abs_delta": 1.5527452230453491,
+          "nonidentical_fraction": 0.5237037604350157
+        },
+        "1-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0011665630931783622,
+          "reverse_mean_k3": 0.001177914322590174,
+          "rms_logprob_delta": 0.048093629471027376,
+          "max_abs_delta": 1.0513200759887695,
+          "nonidentical_fraction": 0.4891246074902351
+        }
+      },
+      "policy_comparisons": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.002267667206420504,
+          "reverse_mean_k3": 0.0021919531504989583,
+          "rms_logprob_delta": 0.06624081830570072,
+          "max_abs_delta": 1.281611442565918,
+          "nonidentical_fraction": 0.8855020295626866
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0021841555364115247,
+          "reverse_mean_k3": 0.0021510568771836644,
+          "rms_logprob_delta": 0.06540468496492012,
+          "max_abs_delta": 0.9757411479949951,
+          "nonidentical_fraction": 0.8876081795205637
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0020693864408986543,
+          "reverse_mean_k3": 0.0020539123490446957,
+          "rms_logprob_delta": 0.06380421090867194,
+          "max_abs_delta": 1.065805196762085,
+          "nonidentical_fraction": 0.8850042122999158
+        }
+      ]
+    },
+    "concurrent32": {
+      "repeat_pairs": {
+        "0-1": {
+          "tokens": 26114,
+          "mean_k3": 0.0013091553927412852,
+          "reverse_mean_k3": 0.0013422316427992153,
+          "rms_logprob_delta": 0.05116043505958929,
+          "max_abs_delta": 1.0978736877441406,
+          "nonidentical_fraction": 0.5726430267289576
+        },
+        "0-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0013091553927412852,
+          "reverse_mean_k3": 0.0013422316427992153,
+          "rms_logprob_delta": 0.05116043505958929,
+          "max_abs_delta": 1.0978736877441406,
+          "nonidentical_fraction": 0.5726430267289576
+        },
+        "1-2": {
+          "tokens": 26114,
+          "mean_k3": 0.0,
+          "reverse_mean_k3": 0.0,
+          "rms_logprob_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        }
+      },
+      "policy_comparisons": [
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0022411915183368335,
+          "reverse_mean_k3": 0.0021955278119604807,
+          "rms_logprob_delta": 0.06605179485679574,
+          "max_abs_delta": 1.2898577451705933,
+          "nonidentical_fraction": 0.886918894079804
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0021778835474780445,
+          "reverse_mean_k3": 0.0020892116846761527,
+          "rms_logprob_delta": 0.06482325968785936,
+          "max_abs_delta": 1.2898577451705933,
+          "nonidentical_fraction": 0.8870337749865972
+        },
+        {
+          "tokens": 26114,
+          "mean_k3": 0.0021778835474780445,
+          "reverse_mean_k3": 0.0020892116846761527,
+          "rms_logprob_delta": 0.06482325968785936,
+          "max_abs_delta": 1.2898577451705933,
+          "nonidentical_fraction": 0.8870337749865972
+        }
+      ]
+    }
+  },
+  "background_isolation": {
+    "initial_unfinished_requests": 0,
+    "drain_seconds": 0.2007423141039908,
+    "max_foreign_requests_during_measurement": 0
+  },
+  "cross_mode": {
+    "serial1_vs_microbatch4": [
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0015196298398873222,
+        "reverse_mean_k3": 0.0015626685297866771,
+        "rms_logprob_delta": 0.055098070925763055,
+        "max_abs_delta": 1.1311020851135254,
+        "nonidentical_fraction": 0.645822164356284
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0015088765146983947,
+        "reverse_mean_k3": 0.001533266653862019,
+        "rms_logprob_delta": 0.05473089442888087,
+        "max_abs_delta": 1.137195110321045,
+        "nonidentical_fraction": 0.6250670138622961
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0014016976171576556,
+        "reverse_mean_k3": 0.0014151500186661684,
+        "rms_logprob_delta": 0.052681875561192686,
+        "max_abs_delta": 1.1311020851135254,
+        "nonidentical_fraction": 0.5949299226468561
+      }
+    ],
+    "serial1_vs_concurrent32": [
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0019022599506179237,
+        "reverse_mean_k3": 0.001901628061651363,
+        "rms_logprob_delta": 0.06124642124117753,
+        "max_abs_delta": 0.9784250259399414,
+        "nonidentical_fraction": 0.8324270506241863
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.001817363087913602,
+        "reverse_mean_k3": 0.0017762521081338882,
+        "rms_logprob_delta": 0.05953430946056922,
+        "max_abs_delta": 1.0398030281066895,
+        "nonidentical_fraction": 0.7922187332465345
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.001817363087913602,
+        "reverse_mean_k3": 0.0017762521081338882,
+        "rms_logprob_delta": 0.05953430946056922,
+        "max_abs_delta": 1.0398030281066895,
+        "nonidentical_fraction": 0.7922187332465345
+      }
+    ],
+    "microbatch4_vs_concurrent32": [
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0011766344703825285,
+        "reverse_mean_k3": 0.0012094705293895867,
+        "rms_logprob_delta": 0.048443277454852975,
+        "max_abs_delta": 1.3306236267089844,
+        "nonidentical_fraction": 0.6157999540476373
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.001707172000709018,
+        "reverse_mean_k3": 0.0016665076027463494,
+        "rms_logprob_delta": 0.05764462175565241,
+        "max_abs_delta": 1.3295115232467651,
+        "nonidentical_fraction": 0.7335528835107605
+      },
+      {
+        "tokens": 26114,
+        "mean_k3": 0.0011942541133194802,
+        "reverse_mean_k3": 0.0011378240241134254,
+        "rms_logprob_delta": 0.04789174616790192,
+        "max_abs_delta": 1.4571082592010498,
+        "nonidentical_fraction": 0.6035842842919507
+      }
+    ]
+  },
+  "resident_parameter_checks": [
+    {
+      "rank": 0,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 1,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 2,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 3,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 4,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 5,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 6,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    },
+    {
+      "rank": 7,
+      "tensors": 906,
+      "sampled_bits_unchanged": true
+    }
+  ],
+  "refit_transport": [
+    {
+      "refit": 0,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    },
+    {
+      "refit": 1,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    },
+    {
+      "refit": 2,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    }
+  ],
+  "fp32_a_log_wire_verified": true,
+  "pass_order": [
+    "concurrent32",
+    "serial1",
+    "microbatch4",
+    "microbatch4",
+    "serial1",
+    "concurrent32",
+    "serial1",
+    "concurrent32",
+    "microbatch4"
+  ],
+  "pass_seconds": [
+    1.7448008782230318,
+    5.12333123292774,
+    3.012908906210214,
+    2.9633064442314208,
+    5.141143492888659,
+    1.7230251329019666,
+    5.156336327083409,
+    1.7467121039517224,
+    2.80944501189515
+  ],
+  "actual_sampling_profile": {
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "top_k": -1,
+    "min_p": 0.0,
+    "min_tokens": 0,
+    "ignore_eos": false,
+    "repetition_penalty": 1.0,
+    "presence_penalty": 0.0,
+    "frequency_penalty": 0.0
+  },
+  "actual_execution_profile": [
+    {
+      "rank": 0,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 1,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 2,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 3,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 4,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 5,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 6,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    },
+    {
+      "rank": 7,
+      "model_training": false,
+      "active_dropout_modules": [],
+      "ssm_cache_dtypes": [
+        "torch.float32"
+      ],
+      "prefill_backends": [
+        "flashinfer"
+      ]
+    }
+  ],
+  "native_training_metrics": [
+    {
+      "nemo_rl/step": 601,
+      "gen_kl_error": 0.002050623098057258,
+      "weight_version_lag": 0,
+      "num_valid_samples": 32.0,
+      "lr": 1e-06
+    },
+    {
+      "nemo_rl/step": 602,
+      "gen_kl_error": 0.0020259171433281153,
+      "weight_version_lag": 1,
+      "num_valid_samples": 32.0,
+      "lr": 1e-06
+    }
+  ]
+}

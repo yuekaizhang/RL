@@ -1,42 +1,59 @@
 # AutoModel checkpoint600 固定 token KL 排查
 
-2026-11-06 03:07 更新：**同权重、同 token、同一种 prefill 实现，重复评分
-本身就出现约0.0016–0.0019的 K3，已与本轮 lag0 的 gen KL 约0.00194同量级。**
-因此，下面第一轮单次 A/B 的约9%下降，不能视为稳定、可归因的修复效果。
-`A_log` 的 FP32→BF16 精度损失仍是独立验证过的事实，保留FP32的修复有效；
-它对整体训练 KL 的影响尚未建立可靠结论。
+2026-11-06 03:31 更新：**相同权重、相同 token 下，串行评分三次逐位一致，
+4并发与32并发时出现明显重复差异。** 因此，生成端差异至少有一部分依赖
+请求调度、batch形状或缓存条件，不能全部解释为 LA1 策略滞后。
+不过，稳定的串行评分与同version600的policy仍有约0.00216的K3差异，
+剩余根因尚未完全定位，也不能将并发差异直接定性为某个kernel的bug。
 
-完整对照及两次更新在 `21379496` 中完成，主要分析结果已保存。
-该作业最后因单层重放的辅助 kernel 调用缺少状态索引而 exit1；已仅用
-1GPU作业 `21384317` 补完重放，COMPLETED/exit0，未重新训练模型。
-机器结果见 [repeat-summary.json](repeat-summary.json) 和
-[gdn-state-summary.json](gdn-state-summary.json)。
+作业 `21384522` COMPLETED/exit0，原1030镜像，EP16 policy + TP8 vLLM，
+checkpoint600只读，完成600→602两次真实更新。固定32条序列、26,114个
+有效response token，每种并发量预热后重复3次，按交错顺序执行。
+机器结果见 [scheduling-summary.json](scheduling-summary.json)。
 
-| 本轮相同24,316个有效 response token 的对照 | mean K3 |
+| 同一组权重和token的对照 | mean K3 |
 |---|---:|
-| 原始生成与policy，同version600，lag0 | 0.00193933 |
-| 原始 FlashInfer prefill 连续重复两次 | 0.00169084 |
-| FP32 A_log 的 FlashInfer prefill 连续重复两次 | 0.00154652 |
-| Triton/FLA prefill 连续重复两次 | 0.00161255 |
-| 恢复原始权重后与之前的原始评分比较 | 0.00193177 |
+| 串行1，三组重复评分两两比较 | **全部0，所有logprob逐位一致** |
+| 并发4，三组重复评分两两比较 | 0.00070238 / 0.00127714 / 0.00116656 |
+| 并发32，三组重复评分两两比较 | 0.00130916 / 0.00130916 / 0 |
+| 串行评分与同version600 policy，三次 | **稳定0.00216220** |
+| 串行与并发32，按轮次比较 | 0.00190226 / 0.00181736 / 0.00181736 |
 
-这些重复是在同一权重、同一请求 token 下完成，但实际 batching、请求调度
-及 prefix cache 使用可能变化；目前还不能把差异定性为某个 kernel 的固有
-不确定性。切换 Triton 后重复差异仍存在，也未单独指认 FlashInfer 为根因。
-所有8个rank、30层都实际执行了替代方法，每层36次，之后恢复原方法。
+评分前确认后台请求排空；每20ms观察，整个评分期间没有外部rollout混入。
+所有8个rank的906个resident tensor抽样前后逐位不变，实际model.eval、
+没有活动Dropout，所有30层SSM cache均FP32。三次refit每次1026个HF tensor
+在全部8个接收端抽样精确匹配。生产修复已生效：30层`A_log`的wire dtype
+均FP32，量化误差为0。这些是抽样检查，并非所有resident映射的穷尽证明。
 
-运行时探针确认：**所有 SSM cache 都是 FP32**，conv cache 为 BF16，
-`A_log` 为 FP32、`dt_bias` 为 BF16。因此“BF16 SSM cache 每步回写导致积累”
-不适用于当前主运行。真实第一层544个 token 的同输入重放中，使用同一个
-Triton recurrent kernel，FP32逐token与FP32连续计算的输出和最终状态均
-完全一致；人为改为BF16状态后输出有约0.55%相对RMS差异。这个单层测试
-不等于完整 CUDA decode 正确性验证，BF16结果也不是主运行的根因证据。
+两步原生训练指标为：step601 genKL0.0020506231/lag0，
+step602 genKL0.0020259171/lag1；两步LR均1e-6、有效样本均32。
+这两个batch不同，不能相减当作策略滞后的因果效应。
+本轮保存的64份train和32份单步漂移数据完整；数值汇总会在下一次allocation
+复用保存数据完成，不为后处理再训练模型。
 
-下一轮 `21384522` 已提交，固定修复后FP32 A_log权重与token，预热后分别
-用串行、4并发、32并发评分，各重复3次并交错顺序。评分前等待后台请求
-排空，期间记录外部请求是否混入；前后抽样核实生成端参数逐位不变。
-该对照同时改变请求调度、batch形状和可能的prefix复用，不能直接归因于
-GEMM。当前仍待GPU结果，MCore600续跑与旧900步hold保持原安排。
+下一轮 `21385207` 已提交，复用本轮**完全相同的token和policy logprob**，
+同checkpoint600，启用原1030内置的`VLLM_BATCH_INVARIANT=1`，重复同样三种
+并发量与三次评分。八个engine worker必须报告模式已实际初始化；同时核对
+跨作业初始refit抽样相同。该官方模式会一起改变多种计算和归约路径，
+即使有改善，也不能立即归因于某个单独kernel。当前尚待GPU结果。
+现有`vllm_cfg.fp32_lm_head`实现只支持Nemotron-H，不能直接用于当前Qwen；
+AutoModel当前路径实际生成完整logits，并非已启用fused linear CE。
+
+之前 `21379496` 的相同权重、相同token、同一种prefill实现重复评分，
+本身就出现约0.0016–0.0019的K3，与该轮lag0 genKL0.00194同量级。
+因此第一轮单次A_log A/B约9%下降，**不能视为稳定、可归因的修复效果**。
+`A_log`的FP32→BF16精度损失是独立验证过的事实；其对整体训练KL的影响
+尚未建立可靠结论。历史机器结果见 [repeat-summary.json](repeat-summary.json)。
+
+实际所有SSM cache都是FP32，conv cache为BF16、`dt_bias`为BF16。
+“BF16 SSM cache每步回写导致积累”不适用于当前主运行。
+真实第一层544个token的同输入重放中，同一个Triton recurrent kernel的
+FP32逐token与FP32连续计算输出及最终状态完全一致；人为使用BF16状态
+后输出有约0.55%相对RMS差异。这是单层机制对照，不等于完整CUDA decode
+正确性验证，BF16结果也不是主运行根因证据。
+完整对照和两次更新在21379496中完成；其最后的辅助重放因缺状态索引exit1，
+已仅用1GPU作业 `21384317` 补完，COMPLETED/exit0。
+见 [gdn-state-summary.json](gdn-state-summary.json)。
 
 以下保留第一轮诊断的原始结果，便于对照。
 
@@ -121,20 +138,9 @@ kernel、缓存状态精度和 batching。原镜像代码采用 GDN chunked pref
 `results/a-log-fix-21379230.json`。早先 `21379127` 在测试启动前因隔离环境
 缺少 pytest 退出；重试仅安装小型测试依赖到容器 /tmp，没有同步模型依赖。
 
-本次没有用修复后的源码重跑完整收敛实验。它是已确认精度损失的最小修复，
-不是剩余 KL 的完整根因结论。后续宜先做同 token 重复评分负对照，再隔离
-prefill/decode GDN 路径和缓存 dtype，保持原训练目标与 checkpoint 不变。
-重复评分作业 `21379496` 已提交：相同 token 按原始/原始/FP32/FP32/恢复原始
-的顺序评分，每次清空 prefix cache。旧 BF16 refit 仅通过隔离诊断 hook
-显式重现，普通训练使用修复后的 FP32 规则。该轮结果尚未产生。
+本次没有用修复后的源码重跑完整收敛实验。`A_log`修复已通过15项GPU回归，
+并在21384522完整两步诊断中验证实际FP32传输；它不是剩余KL的完整根因结论。
+最新的串行/并发负对照和下一步固定token计划见本文开头。
 
-继续排查时，已在仍排队的同一作业中增加：相同权重、相同 token，仅将
-GDN prefill 从官方 FlashInfer 方法切换为官方 Triton/FLA 方法，重复评分并
-恢复原方法；同时记录真实 sampling 参数、各层 cache dtype 和实际调用次数。
-另捕获一层真实 Q/K/V，在同一 allocation 内重放最多1024个 token，比较
-连续FP32计算、逐token FP32状态和逐token BF16状态。后者仅检验单层状态
-存储精度的机制，不能直接作为整模型 KL 或 CUDA decode bug 的结论。
-这些新增对照目前只通过静态检查，尚待 GPU 实验结果。
-
-MCore600续跑独立进行，原300结果和 stop 标记保留。旧 AutoModel900
-作业21315214/16/17继续保持用户 hold。
+MCore600续跑独立进行，两组仍Priority排队、无新300步之后的数据；原300
+结果和stop标记保留。旧AutoModel900作业21315214/16/17继续保持用户hold。
