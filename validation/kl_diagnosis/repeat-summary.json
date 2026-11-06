@@ -1,0 +1,643 @@
+{
+  "status": "completed",
+  "scope": "AutoModel checkpoint600, EP16, configured LA0, two real updates; recovered batches have lag0 then lag1. Sampled refit payloads, not exhaustive resident mapping proof.",
+  "train_eval_same_version": {
+    "tokens": 50030,
+    "mean_logprob_delta": 0.0,
+    "rms_logprob_delta": 0.0,
+    "max_abs_delta": 0.0,
+    "positive_fraction": 0.0,
+    "negative_fraction": 0.0,
+    "mean_k3": 0.0,
+    "reverse_mean_k3": 0.0
+  },
+  "generation_policy_mixed_lag0_lag1": {
+    "tokens": 50030,
+    "mean_logprob_delta": -0.002014490001476569,
+    "rms_logprob_delta": 0.06470820791593779,
+    "max_abs_delta": 1.6914076805114746,
+    "positive_fraction": 0.41613032180691584,
+    "negative_fraction": 0.46729962022786325,
+    "mean_k3": 0.0020737440184846368,
+    "reverse_mean_k3": 0.0021996548496686546
+  },
+  "policy_single_update_same_tokens": {
+    "tokens": 50030,
+    "mean_logprob_delta": -0.0008165847857559027,
+    "rms_logprob_delta": 0.07162364564373859,
+    "max_abs_delta": 3.836373805999756,
+    "positive_fraction": 0.4333799720167899,
+    "negative_fraction": 0.4375774535278833,
+    "mean_k3": 0.002414742610354867,
+    "reverse_mean_k3": 0.0035251935630598442
+  },
+  "refit_transport": [
+    {
+      "refit": 0,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    },
+    {
+      "refit": 1,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    },
+    {
+      "refit": 2,
+      "tensors": 1026,
+      "receiver_ranks": 8,
+      "payload_samples": "exact_match"
+    }
+  ],
+  "admission": [
+    {
+      "step": 600,
+      "trainer_version": 600,
+      "rollout_versions": [
+        600
+      ],
+      "lag": [
+        0
+      ],
+      "unique_samples": 32
+    },
+    {
+      "step": 601,
+      "trainer_version": 601,
+      "rollout_versions": [
+        600
+      ],
+      "lag": [
+        1
+      ],
+      "unique_samples": 32
+    }
+  ],
+  "per_step": {
+    "600": {
+      "train_eval": {
+        "tokens": 24316,
+        "mean_logprob_delta": 0.0,
+        "rms_logprob_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "positive_fraction": 0.0,
+        "negative_fraction": 0.0,
+        "mean_k3": 0.0,
+        "reverse_mean_k3": 0.0
+      },
+      "generation_policy": {
+        "tokens": 24316,
+        "mean_logprob_delta": -0.0016406977151833524,
+        "rms_logprob_delta": 0.0626905694644102,
+        "max_abs_delta": 1.1157408952713013,
+        "positive_fraction": 0.4190656357953611,
+        "negative_fraction": 0.47783352525086364,
+        "mean_k3": 0.0019393289847298542,
+        "reverse_mean_k3": 0.002039644662736437
+      },
+      "drift": {
+        "tokens": 24316,
+        "mean_logprob_delta": -0.0010615044596540323,
+        "rms_logprob_delta": 0.06551824822968069,
+        "max_abs_delta": 2.473391056060791,
+        "positive_fraction": 0.4597384438229972,
+        "negative_fraction": 0.42494653725941767,
+        "mean_k3": 0.002069588465853652,
+        "reverse_mean_k3": 0.0024254569921411152
+      }
+    },
+    "601": {
+      "train_eval": {
+        "tokens": 25714,
+        "mean_logprob_delta": 0.0,
+        "rms_logprob_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "positive_fraction": 0.0,
+        "negative_fraction": 0.0,
+        "mean_k3": 0.0,
+        "reverse_mean_k3": 0.0
+      },
+      "generation_policy": {
+        "tokens": 25714,
+        "mean_logprob_delta": -0.002367960221337574,
+        "rms_logprob_delta": 0.06655991305838634,
+        "max_abs_delta": 1.6914076805114746,
+        "positive_fraction": 0.4133545928288092,
+        "negative_fraction": 0.45733841487127636,
+        "mean_k3": 0.002200851273706745,
+        "reverse_mean_k3": 0.0023509657194455786
+      },
+      "drift": {
+        "tokens": 25714,
+        "mean_logprob_delta": -0.0005849807260799706,
+        "rms_logprob_delta": 0.07695278000392317,
+        "max_abs_delta": 3.836373805999756,
+        "positive_fraction": 0.40845453838375984,
+        "negative_fraction": 0.4495216613517928,
+        "mean_k3": 0.00274113166603238,
+        "reverse_mean_k3": 0.004565140458076558
+      }
+    }
+  },
+  "a_log_fp32_same_tokens_same_policy": {
+    "original_refit_prefill_vs_policy": {
+      "tokens": 24316,
+      "mean_logprob_delta": -0.0002619985441244916,
+      "rms_logprob_delta": 0.06469145933621882,
+      "max_abs_delta": 1.2214628458023071,
+      "positive_fraction": 0.4335417009376542,
+      "negative_fraction": 0.46269945714755717,
+      "mean_k3": 0.002118179881686347,
+      "reverse_mean_k3": 0.002125469659888126
+    },
+    "fp32_a_log_prefill_vs_policy": {
+      "tokens": 24316,
+      "mean_logprob_delta": 3.1742800621861466e-05,
+      "rms_logprob_delta": 0.06323361583450632,
+      "max_abs_delta": 0.8045480251312256,
+      "positive_fraction": 0.4151587432143445,
+      "negative_fraction": 0.4782859022865603,
+      "mean_k3": 0.0020269695044338224,
+      "reverse_mean_k3": 0.002010942571904953
+    },
+    "original_prefill_vs_original_decode": {
+      "tokens": 24316,
+      "mean_logprob_delta": -0.0013786991689334414,
+      "rms_logprob_delta": 0.061776249407435126,
+      "max_abs_delta": 0.843348503112793,
+      "positive_fraction": 0.4285244283599276,
+      "negative_fraction": 0.4527471623622306,
+      "mean_k3": 0.0018830144906464552,
+      "reverse_mean_k3": 0.0019712948433836977
+    },
+    "changes": [
+      {
+        "patched": 30,
+        "rank": 0
+      },
+      {
+        "patched": 30,
+        "rank": 1
+      },
+      {
+        "patched": 30,
+        "rank": 2
+      },
+      {
+        "patched": 30,
+        "rank": 3
+      },
+      {
+        "patched": 30,
+        "rank": 4
+      },
+      {
+        "patched": 30,
+        "rank": 5
+      },
+      {
+        "patched": 30,
+        "rank": 6
+      },
+      {
+        "patched": 30,
+        "rank": 7
+      }
+    ],
+    "restored": [
+      {
+        "restored": 30
+      },
+      {
+        "restored": 30
+      },
+      {
+        "restored": 30
+      },
+      {
+        "restored": 30
+      },
+      {
+        "restored": 30
+      },
+      {
+        "restored": 30
+      },
+      {
+        "restored": 30
+      },
+      {
+        "restored": 30
+      }
+    ]
+  },
+  "a_log_repeat_controls": {
+    "legacy_a_log_override": true,
+    "same_weights_same_tokens": {
+      "before_repeat": {
+        "tokens": 24316,
+        "mean_logprob_delta": -9.575188824747327e-05,
+        "rms_logprob_delta": 0.05808171113396122,
+        "max_abs_delta": 1.5278207063674927,
+        "positive_fraction": 0.36107912485606186,
+        "negative_fraction": 0.3626007567034052,
+        "mean_k3": 0.0016908376641217198,
+        "reverse_mean_k3": 0.001744433113575268
+      },
+      "after_repeat": {
+        "tokens": 24316,
+        "mean_logprob_delta": 9.812146723894001e-05,
+        "rms_logprob_delta": 0.055132685700948966,
+        "max_abs_delta": 0.857907772064209,
+        "positive_fraction": 0.35092120414541866,
+        "negative_fraction": 0.33813127159072215,
+        "mean_k3": 0.0015465226132441708,
+        "reverse_mean_k3": 0.00152475152269643
+      },
+      "restored_before": {
+        "tokens": 24316,
+        "mean_logprob_delta": -0.00047381706618399185,
+        "rms_logprob_delta": 0.06234130904851035,
+        "max_abs_delta": 2.3090157508850098,
+        "positive_fraction": 0.39702253660141473,
+        "negative_fraction": 0.399161046224708,
+        "mean_k3": 0.0019317747293374204,
+        "reverse_mean_k3": 0.0021187830113883303
+      }
+    }
+  },
+  "prefill_kernel_ab": {
+    "scope": "Identical checkpoint600 policy/tokens/weights, restored legacy BF16-rounded A_log; only prefill method changes. Original decode is CUDA.",
+    "metrics": {
+      "flashinfer_vs_policy": {
+        "tokens": 24316,
+        "mean_logprob_delta": 0.0002118185294218553,
+        "rms_logprob_delta": 0.06813820331796377,
+        "max_abs_delta": 2.6385045051574707,
+        "positive_fraction": 0.42881230465537096,
+        "negative_fraction": 0.4667708504688271,
+        "mean_k3": 0.0026126600065686334,
+        "reverse_mean_k3": 0.002321610820308616
+      },
+      "triton_vs_policy": {
+        "tokens": 24316,
+        "mean_logprob_delta": -0.0003399190369610506,
+        "rms_logprob_delta": 0.06516145820267365,
+        "max_abs_delta": 1.15971040725708,
+        "positive_fraction": 0.4164336239513078,
+        "negative_fraction": 0.478368152656687,
+        "mean_k3": 0.002174979808757085,
+        "reverse_mean_k3": 0.00212570721886973
+      },
+      "flashinfer_vs_decode": {
+        "tokens": 24316,
+        "mean_logprob_delta": -0.001852516238997746,
+        "rms_logprob_delta": 0.0638397445407793,
+        "max_abs_delta": 2.101639986038208,
+        "positive_fraction": 0.4278664253989143,
+        "negative_fraction": 0.45340516532324393,
+        "mean_k3": 0.0019627662255939106,
+        "reverse_mean_k3": 0.002233936601583238
+      },
+      "triton_vs_decode": {
+        "tokens": 24316,
+        "mean_logprob_delta": -0.0013007786786399843,
+        "rms_logprob_delta": 0.06565313069452025,
+        "max_abs_delta": 1.1604349613189697,
+        "positive_fraction": 0.4478121401546307,
+        "negative_fraction": 0.43522783352525085,
+        "mean_k3": 0.0021255639052152604,
+        "reverse_mean_k3": 0.0022506704120237296
+      },
+      "triton_vs_flashinfer": {
+        "tokens": 24316,
+        "mean_logprob_delta": 0.0005517375567288343,
+        "rms_logprob_delta": 0.06755520852896156,
+        "max_abs_delta": 2.356992244720459,
+        "positive_fraction": 0.45702418160881725,
+        "negative_fraction": 0.4257690409606843,
+        "mean_k3": 0.0024707273210279853,
+        "reverse_mean_k3": 0.0022868026987396374
+      },
+      "triton_repeat": {
+        "tokens": 24316,
+        "mean_logprob_delta": -0.00046678673913402017,
+        "rms_logprob_delta": 0.056621223552052596,
+        "max_abs_delta": 1.099711298942566,
+        "positive_fraction": 0.34960519822339203,
+        "negative_fraction": 0.34845369304161866,
+        "mean_k3": 0.001612553708618802,
+        "reverse_mean_k3": 0.001636447292718301
+      },
+      "flashinfer_restored": {
+        "tokens": 24316,
+        "mean_logprob_delta": 0.00047381706618399185,
+        "rms_logprob_delta": 0.06234130904851035,
+        "max_abs_delta": 2.3090157508850098,
+        "positive_fraction": 0.399161046224708,
+        "negative_fraction": 0.39702253660141473,
+        "mean_k3": 0.0021187830113883303,
+        "reverse_mean_k3": 0.0019317747293374204
+      }
+    },
+    "switched": [
+      {
+        "rank": 0,
+        "triton_layers": 30
+      },
+      {
+        "rank": 1,
+        "triton_layers": 30
+      },
+      {
+        "rank": 2,
+        "triton_layers": 30
+      },
+      {
+        "rank": 3,
+        "triton_layers": 30
+      },
+      {
+        "rank": 4,
+        "triton_layers": 30
+      },
+      {
+        "rank": 5,
+        "triton_layers": 30
+      },
+      {
+        "rank": 6,
+        "triton_layers": 30
+      },
+      {
+        "rank": 7,
+        "triton_layers": 30
+      }
+    ],
+    "restored": [
+      {
+        "rank": 0,
+        "restored_layers": 30,
+        "min_triton_calls_per_layer": 36,
+        "total_triton_calls": 1080
+      },
+      {
+        "rank": 1,
+        "restored_layers": 30,
+        "min_triton_calls_per_layer": 36,
+        "total_triton_calls": 1080
+      },
+      {
+        "rank": 2,
+        "restored_layers": 30,
+        "min_triton_calls_per_layer": 36,
+        "total_triton_calls": 1080
+      },
+      {
+        "rank": 3,
+        "restored_layers": 30,
+        "min_triton_calls_per_layer": 36,
+        "total_triton_calls": 1080
+      },
+      {
+        "rank": 4,
+        "restored_layers": 30,
+        "min_triton_calls_per_layer": 36,
+        "total_triton_calls": 1080
+      },
+      {
+        "rank": 5,
+        "restored_layers": 30,
+        "min_triton_calls_per_layer": 36,
+        "total_triton_calls": 1080
+      },
+      {
+        "rank": 6,
+        "restored_layers": 30,
+        "min_triton_calls_per_layer": 36,
+        "total_triton_calls": 1080
+      },
+      {
+        "rank": 7,
+        "restored_layers": 30,
+        "min_triton_calls_per_layer": 36,
+        "total_triton_calls": 1080
+      }
+    ]
+  },
+  "actual_sampling_profile": {
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "top_k": -1,
+    "min_p": 0.0,
+    "min_tokens": 0,
+    "ignore_eos": false,
+    "repetition_penalty": 1.0,
+    "presence_penalty": 0.0,
+    "frequency_penalty": 0.0
+  },
+  "actual_execution_profile": [
+    {
+      "rank": 0,
+      "layers": 30,
+      "prefill_backend": [
+        "flashinfer"
+      ],
+      "prefill_method": [
+        "forward_cuda"
+      ],
+      "decode_kernel": [
+        "cuda"
+      ],
+      "conv_cache_dtype": [
+        "torch.bfloat16"
+      ],
+      "ssm_cache_dtype": [
+        "torch.float32"
+      ],
+      "a_log_dtype": [
+        "torch.float32"
+      ],
+      "dt_bias_dtype": [
+        "torch.bfloat16"
+      ]
+    },
+    {
+      "rank": 1,
+      "layers": 30,
+      "prefill_backend": [
+        "flashinfer"
+      ],
+      "prefill_method": [
+        "forward_cuda"
+      ],
+      "decode_kernel": [
+        "cuda"
+      ],
+      "conv_cache_dtype": [
+        "torch.bfloat16"
+      ],
+      "ssm_cache_dtype": [
+        "torch.float32"
+      ],
+      "a_log_dtype": [
+        "torch.float32"
+      ],
+      "dt_bias_dtype": [
+        "torch.bfloat16"
+      ]
+    },
+    {
+      "rank": 2,
+      "layers": 30,
+      "prefill_backend": [
+        "flashinfer"
+      ],
+      "prefill_method": [
+        "forward_cuda"
+      ],
+      "decode_kernel": [
+        "cuda"
+      ],
+      "conv_cache_dtype": [
+        "torch.bfloat16"
+      ],
+      "ssm_cache_dtype": [
+        "torch.float32"
+      ],
+      "a_log_dtype": [
+        "torch.float32"
+      ],
+      "dt_bias_dtype": [
+        "torch.bfloat16"
+      ]
+    },
+    {
+      "rank": 3,
+      "layers": 30,
+      "prefill_backend": [
+        "flashinfer"
+      ],
+      "prefill_method": [
+        "forward_cuda"
+      ],
+      "decode_kernel": [
+        "cuda"
+      ],
+      "conv_cache_dtype": [
+        "torch.bfloat16"
+      ],
+      "ssm_cache_dtype": [
+        "torch.float32"
+      ],
+      "a_log_dtype": [
+        "torch.float32"
+      ],
+      "dt_bias_dtype": [
+        "torch.bfloat16"
+      ]
+    },
+    {
+      "rank": 4,
+      "layers": 30,
+      "prefill_backend": [
+        "flashinfer"
+      ],
+      "prefill_method": [
+        "forward_cuda"
+      ],
+      "decode_kernel": [
+        "cuda"
+      ],
+      "conv_cache_dtype": [
+        "torch.bfloat16"
+      ],
+      "ssm_cache_dtype": [
+        "torch.float32"
+      ],
+      "a_log_dtype": [
+        "torch.float32"
+      ],
+      "dt_bias_dtype": [
+        "torch.bfloat16"
+      ]
+    },
+    {
+      "rank": 5,
+      "layers": 30,
+      "prefill_backend": [
+        "flashinfer"
+      ],
+      "prefill_method": [
+        "forward_cuda"
+      ],
+      "decode_kernel": [
+        "cuda"
+      ],
+      "conv_cache_dtype": [
+        "torch.bfloat16"
+      ],
+      "ssm_cache_dtype": [
+        "torch.float32"
+      ],
+      "a_log_dtype": [
+        "torch.float32"
+      ],
+      "dt_bias_dtype": [
+        "torch.bfloat16"
+      ]
+    },
+    {
+      "rank": 6,
+      "layers": 30,
+      "prefill_backend": [
+        "flashinfer"
+      ],
+      "prefill_method": [
+        "forward_cuda"
+      ],
+      "decode_kernel": [
+        "cuda"
+      ],
+      "conv_cache_dtype": [
+        "torch.bfloat16"
+      ],
+      "ssm_cache_dtype": [
+        "torch.float32"
+      ],
+      "a_log_dtype": [
+        "torch.float32"
+      ],
+      "dt_bias_dtype": [
+        "torch.bfloat16"
+      ]
+    },
+    {
+      "rank": 7,
+      "layers": 30,
+      "prefill_backend": [
+        "flashinfer"
+      ],
+      "prefill_method": [
+        "forward_cuda"
+      ],
+      "decode_kernel": [
+        "cuda"
+      ],
+      "conv_cache_dtype": [
+        "torch.bfloat16"
+      ],
+      "ssm_cache_dtype": [
+        "torch.float32"
+      ],
+      "a_log_dtype": [
+        "torch.float32"
+      ],
+      "dt_bias_dtype": [
+        "torch.bfloat16"
+      ]
+    }
+  ]
+}
