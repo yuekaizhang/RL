@@ -146,8 +146,9 @@ optimizer, scheduler, dataloader and native replay state. New checkpoints/logs
 go to `results/yuekaiz-mcore-la{0,1}-600/`, so retention does not delete the
 original 300-step checkpoint. Later allocations discover the latest new
 checkpoint. An allocated preflight exercises the image's actual scheduler API
-over synthetic updates301–600. Full optimizer restore and LR must be verified
-at the first native step301; that training check is still pending.
+over synthetic updates301–600. Both cases subsequently resumed their complete
+step300 checkpoints and completed native step301 with LR 1e-6, 32 valid samples,
+lags 0/1 and no discarded or logprob-masked sequences. Warmup did not restart.
 
 Submitted chains (four 4-hour allocations each, with afterok dependencies):
 
@@ -157,7 +158,7 @@ Submitted chains (four 4-hour allocations each, with afterok dependencies):
 The first chains failed before checkpoint loading because Megatron-LM's
 `examples` package shadowed the repository entrypoint. The wrapper now loads
 the exact source file. Recovery preflight21388461 passed both entries and
-checkpoint discovery; full model/optimizer resume is still pending. Old IDs
+checkpoint discovery; the replacement jobs also passed the real resume above. Old IDs
 are archived in `slurm/submitted-to600-attempt1.tsv`.
 
 `slurm/submitted-to600.tsv` contains the current chains; all IDs also appear
@@ -176,3 +177,13 @@ Plotting runs inside allocations with `plot.py --target-steps 600`, producing
 `results/comparison-to600.png`. Original300 report/plot remain available.
 AutoModel fixed-token KL diagnosis continues independently; the AutoModel900
 hold must not be released.
+
+At LA0 step384, `policy_kl_error` briefly reached 2.39368 while
+`gen_kl_error` was 0.001343; step385 returned to approximately 0.001 in both
+directions. Loss, gradient norm, LR and sample counts remained finite and normal.
+These diagnostics apply opposite, unclamped K3 directions to the same previous
+policy and generation logprobs; the spike does not by itself establish a large
+optimizer update. The scalar logs do not identify the responsible tokens or
+their cause. See `policy-kl-spike-summary.json` for the measurements.
+The monitor reports any recent `policy_kl_error > 0.01` once per case and event
+step. This is a warning only and does not cancel training or change the recipe.

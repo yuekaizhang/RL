@@ -169,6 +169,18 @@ while True:
                 if recent
                 else {}
             )
+            for row in recent:
+                if row["policy_kl_error"] > 0.01:
+                    result["alerts"].append(
+                        {
+                            "lookahead": lag,
+                            "step": current,
+                            "reason": "policy_kl_spike",
+                            "event_step": int(row["nemo_rl/step"]),
+                            "policy_kl_error": row["policy_kl_error"],
+                            "gen_kl_error": row["gen_kl_error"],
+                        }
+                    )
             if recent and (
                 stats["gen_kl_error"]["mean"] > 0.01
                 or stats["is_oob_ratio"]["mean"] > 0.01
@@ -284,6 +296,7 @@ while True:
             )
             failures.update(
                 f"alert|{alert['lookahead']}|{alert.get('reason', 'kl_or_importance')}"
+                f"|{alert.get('event_step', '')}"
                 for alert in result["alerts"]
             )
             if failures - seen_failures:

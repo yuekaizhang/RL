@@ -1,0 +1,67 @@
+{
+  "status": "isolated_finite_reverse_kl_spike",
+  "lookahead": 0,
+  "job": "21388471",
+  "source": "slurm/21388471-logs/ray-driver.log",
+  "measurements": [
+    {
+      "nemo_rl/step": 383,
+      "gen_kl_error": 0.001129993702090388,
+      "policy_kl_error": 0.0011562446672601582,
+      "token_mult_prob_error": 1.0207429540773154,
+      "loss": 0.031205705754226258,
+      "grad_norm": 0.21314272284507751,
+      "approx_entropy": 0.4409722917131932,
+      "lr": 1e-06,
+      "weight_version_lag": 0,
+      "num_valid_samples": 32.0,
+      "dropped_prompt_groups": 0,
+      "num_masked_seqs_by_logprob_error": 0
+    },
+    {
+      "nemo_rl/step": 384,
+      "gen_kl_error": 0.0013427990872794894,
+      "policy_kl_error": 2.3936800050924134,
+      "token_mult_prob_error": 3.4102107548506213,
+      "loss": 0.08623619238355149,
+      "grad_norm": 0.5814181566238403,
+      "approx_entropy": 0.3581739708730501,
+      "lr": 1e-06,
+      "weight_version_lag": 0,
+      "num_valid_samples": 32.0,
+      "dropped_prompt_groups": 0,
+      "num_masked_seqs_by_logprob_error": 0
+    },
+    {
+      "nemo_rl/step": 385,
+      "gen_kl_error": 0.0009793313712971163,
+      "policy_kl_error": 0.0010030831057669062,
+      "token_mult_prob_error": 1.0180654960596813,
+      "loss": 0.00844695023026381,
+      "grad_norm": 0.541590690612793,
+      "approx_entropy": 0.372326012369663,
+      "lr": 1e-06,
+      "weight_version_lag": 0,
+      "num_valid_samples": 32.0,
+      "dropped_prompt_groups": 0,
+      "num_masked_seqs_by_logprob_error": 0
+    },
+    {
+      "nemo_rl/step": 386,
+      "gen_kl_error": 0.0010049473299921954,
+      "policy_kl_error": 0.001038940784252401,
+      "token_mult_prob_error": 1.0177402085501228,
+      "loss": 0.0009776716838790847,
+      "grad_norm": 0.28283926844596863,
+      "approx_entropy": 0.3548634623185601,
+      "lr": 1e-06,
+      "weight_version_lag": 0,
+      "num_valid_samples": 32.0,
+      "dropped_prompt_groups": 0,
+      "num_masked_seqs_by_logprob_error": 0
+    }
+  ],
+  "metric_definition": "clipped_pg_diagnostic_metrics computes gen_kl_error and policy_kl_error by reversing the same previous-policy and generation logprobs; both K3 diagnostics disable input/output clamping.",
+  "scope": "Scalar evidence only. No per-token capture; outlier count and root cause are unverified. No proof of a large optimizer update.",
+  "action": "Continue the unchanged training recipe; warn above policy_kl_error 0.01, deduplicated by case and event step."
+}
