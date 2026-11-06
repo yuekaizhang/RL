@@ -131,3 +131,48 @@ EP16 resume fits; inspect the new jobs before claiming recovery.
 Latest retry IDs are in `slurm/submitted-cpu-staging.tsv`; all retries remain
 in `submitted.tsv`. The submission helper checks that no prior MCore job
 remains queued before creating another chain.
+
+## Continuation from 300 to 600 (user requested 2026-11-05)
+
+`la0_to600.yaml` and `la1_to600.yaml` extend the existing W&B runs to 600 updates.
+The model, batch, lengths, topology, logprob chunk 512, optimizer and LR are
+unchanged. They explicitly restore the saved scheduler using
+`use_checkpoint_opt_param_scheduler=true`, `override_opt_param_scheduler=false`.
+Its old horizon remains 300 updates; constant LR 1e-6 and constant WD 0.1
+continue unchanged beyond that horizon. Warmup and optimizer counters resume.
+
+`run_to600.py` initially reads the complete preserved checkpoint300, including
+optimizer, scheduler, dataloader and native replay state. New checkpoints/logs
+go to `results/yuekaiz-mcore-la{0,1}-600/`, so retention does not delete the
+original 300-step checkpoint. Later allocations discover the latest new
+checkpoint. An allocated preflight exercises the image's actual scheduler API
+over synthetic updates301–600. Full optimizer restore and LR must be verified
+at the first native step301; that training check is still pending.
+
+Submitted chains (four 4-hour allocations each, with afterok dependencies):
+
+- LA0: 21388471 → 21388472 → 21388473 → 21388474.
+- LA1: 21388475 → 21388476 → 21388478 → 21388479.
+
+The first chains failed before checkpoint loading because Megatron-LM's
+`examples` package shadowed the repository entrypoint. The wrapper now loads
+the exact source file. Recovery preflight21388461 passed both entries and
+checkpoint discovery; full model/optimizer resume is still pending. Old IDs
+are archived in `slurm/submitted-to600-attempt1.tsv`.
+
+`slurm/submitted-to600.tsv` contains the current chains; all IDs also appear
+in `submitted.tsv` for continuous plots. `submit_to600.sh --check` verifies
+source checkpoint metadata/shards and recipe differences without submitting.
+Completed cases skip startup in unused allocations; the monitor cancels unused
+queued segments after a durable600 checkpoint and complete metric history.
+
+Run `python -u -m validation.mcore.monitor --target-steps 600` on the login node.
+It writes `results/live-status-to600.json`, checks metrics/queue each minute,
+and uses `watch_to600.sh` to wake the original conversation every ten minutes
+and on failures/alerts. No new crontab is used. The old300
+`results/stop-10min-watch` remains in place; `results/stop-to600-watch` belongs
+to this continuation and is written only after both600 targets finish.
+Plotting runs inside allocations with `plot.py --target-steps 600`, producing
+`results/comparison-to600.png`. Original300 report/plot remain available.
+AutoModel fixed-token KL diagnosis continues independently; the AutoModel900
+hold must not be released.

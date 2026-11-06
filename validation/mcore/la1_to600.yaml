@@ -1,0 +1,14 @@
+defaults: la1.yaml
+grpo:
+  max_num_steps: 600
+policy:
+  megatron_cfg:
+    scheduler:
+      use_checkpoint_opt_param_scheduler: true
+      override_opt_param_scheduler: false
+checkpointing:
+  checkpoint_dir: /lustre/fsw/portfolios/coreai/users/yuekaiz/single_controller/RL-pr4963/validation/mcore/results/yuekaiz-mcore-la1-600/checkpoints
+logger:
+  log_dir: /lustre/fsw/portfolios/coreai/users/yuekaiz/single_controller/RL-pr4963/validation/mcore/results/yuekaiz-mcore-la1-600/logs
+  wandb:
+    resume: must

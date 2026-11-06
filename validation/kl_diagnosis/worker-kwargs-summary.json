@@ -1,0 +1,32 @@
+{
+  "status": "passed",
+  "scope": "Real BaseVllmGenerationWorker._load_model up to _create_engine; actual AsyncEngineArgs config validation; no model or engine created",
+  "old_kwargs_reproduced_duplicate_error": true,
+  "engine_kwargs": {
+    "enable_prefix_caching": false,
+    "tensor_parallel_size": 8,
+    "max_model_len": 4096,
+    "max_num_batched_tokens": 2048,
+    "mamba_cache_dtype": "bfloat16",
+    "mamba_ssm_cache_dtype": "float32",
+    "load_format": "dummy"
+  },
+  "mamba_cache_mode": "none",
+  "source_job": 21390696,
+  "source_job_overall_state": "COMPLETED/exit0",
+  "elapsed": "00:03:27",
+  "unit_test_suites": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "5",
+      "time": "21.922",
+      "timestamp": "2026-11-06T06:47:22.988482-08:00",
+      "hostname": "pool0-01735"
+    }
+  ],
+  "next_full_job": 21390581,
+  "full_fixed_token_comparison_pending": true
+}

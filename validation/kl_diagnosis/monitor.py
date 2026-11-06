@@ -1,0 +1,137 @@
+"""Notify the existing authorized conversation when the submitted diagnostic ends."""
+
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+repo = Path(__file__).resolve().parents[2]
+root = repo / "validation/kl_diagnosis"
+job = sys.argv[1]
+preflight = len(sys.argv) > 2 and sys.argv[2] == "preflight"
+recovery = len(sys.argv) > 2 and sys.argv[2] == "recovery"
+kwargs_preflight = len(sys.argv) > 2 and sys.argv[2] == "kwargs"
+while True:
+    queue = subprocess.run(
+        ["squeue", "-h", "-j", job, "-o", "%T|%R"], capture_output=True, text=True
+    )
+    state = {
+        "job": job,
+        "updated_epoch": time.time(),
+        "queue": queue.stdout.strip(),
+        "query_error": queue.stderr.strip() if queue.returncode else None,
+    }
+    status_kind = (
+        "recovery-preflight"
+        if recovery
+        else ("preflight" if preflight else "diagnosis")
+    )
+    if kwargs_preflight:
+        status_kind = "worker-kwargs-preflight"
+    (root / f"results/{status_kind}-status.json").write_text(
+        json.dumps(state, indent=2) + "\n"
+    )
+    if not queue.returncode and not queue.stdout.strip():
+        accounting = subprocess.run(
+            [
+                "sacct",
+                "-j",
+                job,
+                "-X",
+                "--noheader",
+                "--parsable2",
+                "--format=JobID,State,ExitCode",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        (root / "results/final-accounting.txt").write_text(accounting.stdout)
+        target = json.loads(
+            (repo / "validation/mcore/results/watch-target.json").read_text()
+        )["thread_id"]
+        message = (
+            "[已授权的 gen_kl_error 排查任务完成/失败通知] 请继续原任务，不创建新会话或子agent。项目 "
+            + str(repo)
+            + "。先读 validation/kl_diagnosis/HANDOFF.md，再查询 sacct -j "
+            + job
+            + "，读取 validation/kl_diagnosis/slurm/"
+            + job
+            + "-logs/ray-driver.log 与 results/"
+            + job
+            + "/analysis.json（若存在）。以HANDOFF最新附录及submitted.tsv为准，核实本轮实际控制变量、相同token与policy参考、并发重复评分、实际cache/scheduler配置、train/eval和单步漂移、refit发送/接收探针。不要假设每轮都包含旧A_log A/B。原1030的GDN_ATTN明确不支持batch-invariant模式，不重复提交该失败模式。若失败主动修复并续验证，先查已有作业防重复。不得动旧900步hold，不得修改原checkpoint；原MCore300 stop标记保持。最终给用户证据、根因范围、必要修复与验证结果。"
+        )
+        if preflight:
+            message = (
+                "[已授权的 gen_kl_error 预检完成/失败通知] 继续原任务，不创建新会话或子agent。项目 "
+                + str(repo)
+                + "。先读 validation/kl_diagnosis/HANDOFF.md，查询 sacct -j "
+                + job
+                + "，读取 validation/kl_diagnosis/slurm/preflight-"
+                + job
+                + ".out/.err 与 validation/kl_diagnosis/results/preflight-"
+                + job
+                + ".json（若存在）。核实原1030镜像两侧实际Ray worker解释器、GPU绑定与探针方法。"
+                "再核实 submitted.tsv 最新全EP16诊断作业，避免重复提交；预检失败应主动修复并处理其afterok依赖。"
+                "预检通过不等于KL诊断完成，继续验证checkpoint600固定token A_log FP32 A/B、train/eval和单步漂移、refit探针。"
+                "不得修改原checkpoint，不得释放900步hold，保留MCore stop标记。"
+            )
+        if recovery:
+            message = (
+                "[已授权的 MCore600/固定token排查恢复预检通知] 继续原任务，不创建新会话或子agent。项目 "
+                + str(repo)
+                + "。先读 validation/kl_diagnosis/HANDOFF.md 和 session/20261102_233142/handoff_mcore.md 最新附录。查询 sacct -j "
+                + job
+                + "，读取 validation/kl_diagnosis/slurm/recovery-preflight-"
+                + job
+                + ".out/.err、results/recovery-preflight-"
+                + job
+                + "/recipe-preflight.json、generation-controls-preflight.json，以及 validation/mcore/results/entry-preflight-"
+                + job
+                + "-la{0,1}.json。检查真实Hydra/MasterConfig配置和两组MCore精确文件入口导入。失败主动修复预检并更新afterok依赖；成功继续核实最新MCore600及固定token完整作业。以最新submitted清单为准避免重复，不释放900hold、不修改原checkpoint或300stop。"
+            )
+        if kwargs_preflight:
+            message = (
+                "[已授权的固定token worker参数预检通知] 继续原任务，不创建新会话或子agent。项目 "
+                + str(repo)
+                + "。先读 validation/kl_diagnosis/HANDOFF.md 最新附录，查询 sacct -j "
+                + job
+                + "，读取 validation/kl_diagnosis/slurm/worker-preflight-"
+                + job
+                + ".out/.err、results/worker-preflight-"
+                + job
+                + "/recipe-preflight.json、prefix-config-tests.xml、worker-kwargs-preflight.json。核实真实typed配置、实际BaseVllmGenerationWorker参数组装的旧错误复现和修正后AsyncEngineArgs配置。失败主动修复小预检并处理依赖，成功继续核实submitted.tsv最新完整诊断；不要重复提交已有完整作业。MCore600独立监控，900hold及原checkpoint/300stop保持。"
+            )
+        env = dict(os.environ)
+        prefix = "/lustre/fsw/portfolios/coreai/users/yuekaiz/tools"
+        env["PATH"] = (
+            prefix + "/node/bin:" + prefix + "/codex/bin:/usr/local/bin:/usr/bin:/bin"
+        )
+        result = subprocess.run(
+            [
+                prefix + "/codex/bin/codex",
+                "queue",
+                "--thread",
+                target,
+                "--message",
+                message,
+                "--resume",
+            ],
+            env=env,
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        print(
+            "CONVERSATION_NOTIFICATION",
+            result.returncode,
+            result.stdout.strip(),
+            result.stderr.strip(),
+            flush=True,
+        )
+        break
+    print(json.dumps(state), flush=True)
+    time.sleep(60)

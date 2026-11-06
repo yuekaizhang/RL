@@ -1,6 +1,6 @@
 # AutoModel checkpoint600 固定 token KL 排查
 
-2026-11-06 05:50 更新：**相同权重、相同 token 下，串行评分三次逐位一致，
+2026-11-06 06:50 更新：**相同权重、相同 token 下，串行评分三次逐位一致，
 4并发与32并发时出现明显重复差异。** 因此，生成端差异至少有一部分依赖
 请求调度、batch形状或缓存管理条件，不能全部解释为 LA1 策略滞后。
 不过，稳定的串行评分与同version600的policy仍有约0.00216的K3差异，
@@ -58,12 +58,36 @@ MCore此前两个首段因Megatron同名`examples`包抢占导入而退出，现
 确切源文件路径加载，预检已验证两组入口。以上均未加载完整模型或执行训练。
 机器证据见 [recovery-preflight-summary.json](recovery-preflight-summary.json)。
 
-新的固定token对照 **21388465** 已接续：关闭prefix cache，复用21384522的
-完全相同32条token、policy logprob和checkpoint600；chunk预算2048、SSM/conv
-cache实际精度FP32/BF16保持一致。继续三种并发量各三次评分、两次真实更新
-及三次refit检查，八个worker运行时配置也必须核对。预检通过后已解除依赖，
-当前Priority排队，尚无新KL结果。MCore600两组新首段为21388471／21388475，
-同样通过预检门控后排队；仍需在实际恢复后验证第301步及保存的scheduler。
+`21388465` 仍在启动时退出，耗时6分02秒：NeMo-RL的worker已显式传入
+`enable_prefix_caching`，将同名键放入`vllm_kwargs`造成Python重复传参。
+本轮没有refit、评分或训练更新；之前的配置预检没有覆盖实际worker参数组装，
+不能作为完整启动成功的证据。
+
+现将开关改放在源码读取的`policy.generation.vllm_cfg.enable_prefix_caching`，
+同时补充`VllmSpecificArgs`的可选bool/None声明，并添加三例类型校验回归。
+默认值继续由已有CUDA capability规则决定。新的预检会直接调用生产worker的
+参数组装路径：旧kwargs位置必须复现错误，修正后必须到达engine构造入口，
+并用真实`AsyncEngineArgs`验证最终配置；在该入口截断，不创建完整模型。
+
+真实worker参数组装在 `21390570` 中通过，并在最终预检 `21390696` 中再次通过：旧位置准确复现重复传参
+错误，修正后达到engine构造入口，并通过真实`AsyncEngineArgs`配置校验。
+最终配置为prefix cache关闭、TP8、context4096、chunk2048、SSM FP32／conv
+BF16、dummy加载，Mamba cache mode为`none`，没有创建engine或加载模型。
+见 [worker-kwargs-summary.json](worker-kwargs-summary.json)。
+
+最终预检 **21390696 COMPLETED/exit0，耗时3分27秒**。三例新增类型校验
+和两例已有开关测试全部通过：**5 passed、0失败、0跳过**；真实worker参数
+组装的错误复现、修正后入口以及实际`AsyncEngineArgs`配置校验也全部通过。
+生产配置声明与测试已推送到同一分支，提交 `f93efd64d`。
+
+前两次小预检的测试框架问题已单独处理：仓库全局覆盖改写pytest版本、
+输出捕获冲突，以及`--vllm-only`排除了未标记的纯单元测试。它们不算测试
+通过；最终预检固定pytest8.4.2、关闭捕获并显式执行五个测试节点。
+
+完整同配置对照 **21390581** 依赖最终预检成功，目前等待调度；没有重复提交
+完整实验。继续复用相同R9 token、policy logprob和checkpoint600，chunk2048、
+cache精度、两次更新与三次refit保持原计划。当前尚无关闭prefix cache后的
+KL数值。MCore600两组首段21388471／21388475仍排队，原300步checkpoint保留。
 
 现有`vllm_cfg.fp32_lm_head`实现只支持Nemotron-H，不能直接用于当前Qwen；
 AutoModel当前路径实际生成完整logits，并非已启用fused linear CE。

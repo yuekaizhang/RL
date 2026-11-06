@@ -1,5 +1,6 @@
-"""Compare MCore LA0/LA1 and historical AutoModel curves through step 300."""
+"""Compare MCore LA0/LA1 and historical AutoModel curves."""
 
+import argparse
 import json
 import statistics
 from pathlib import Path
@@ -11,6 +12,9 @@ import matplotlib.pyplot as plt
 
 from validation.scripts.read_metrics import read_metrics
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--target-steps", type=int, choices=(300, 600), default=300)
+target = parser.parse_args().target_steps
 repo = Path(__file__).resolve().parents[2]
 output = repo / "validation/mcore/results"
 output.mkdir(parents=True, exist_ok=True)
@@ -39,7 +43,8 @@ for lag in (0, 1):
                         },
                     }
     series[f"MCore LA{lag}"] = list(records.values())
-    (output / f"la{lag}-history.json").write_text(
+    history_name = f"la{lag}-history" + ("-to600" if target == 600 else "")
+    (output / f"{history_name}.json").write_text(
         json.dumps(series[f"MCore LA{lag}"], indent=2) + "\n"
     )
 for label, path in [
@@ -69,7 +74,7 @@ for label, rows in series.items():
             int(row["nemo_rl/step"])
             for row in rows
             if isinstance(row.get("nemo_rl/step"), (int, float))
-            and 1 <= row["nemo_rl/step"] <= 300
+            and 1 <= row["nemo_rl/step"] <= target
         }
     )
     summary[label] = {
@@ -87,7 +92,7 @@ for ax, metric in zip(axes.flat, metrics):
                     int(row["nemo_rl/step"]): float(row[metric])
                     for row in rows
                     if isinstance(row.get("nemo_rl/step"), (int, float))
-                    and 1 <= row["nemo_rl/step"] <= 300
+                    and 1 <= row["nemo_rl/step"] <= target
                     and isinstance(row.get(metric), (int, float))
                 }.items()
             )
@@ -116,7 +121,7 @@ for ax, metric in zip(axes.flat, metrics):
             "last100_mean": statistics.mean(ys[-100:]),
             "max": max(ys),
         }
-    ax.set(title=metric, xlabel="Optimizer step", xlim=(1, 300))
+    ax.set(title=metric, xlabel="Optimizer step", xlim=(1, target))
     ax.grid(alpha=0.2)
     if plotted:
         ax.legend(fontsize=8)
@@ -132,9 +137,10 @@ figure.suptitle(
     "Qwen3.5-35B-A3B full-batch SC: MCore LA0 / LA1\n20-step means; AutoModel curves are historical, single-seed references"
 )
 figure.tight_layout(rect=(0, 0, 1, 0.96))
-figure.savefig(output / "comparison.png", dpi=140)
+name = "comparison" if target == 300 else "comparison-to600"
+figure.savefig(output / f"{name}.png", dpi=140)
 plt.close(figure)
-(output / "comparison-summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+(output / f"{name}-summary.json").write_text(json.dumps(summary, indent=2) + "\n")
 print(
     json.dumps({name: {"last_step": row["last_step"]} for name, row in summary.items()})
 )

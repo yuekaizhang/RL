@@ -1,0 +1,18 @@
+defaults: ../configs/qwen35_ep16_la1.yaml
+policy:
+  worker_extension_cls_fqn: validation.kl_diagnosis.policy_worker.DiagnosticPolicyWorker
+  generation:
+    worker_extension_cls_fqn: validation.kl_diagnosis.generation_worker.DiagnosticGenerationWorker
+grpo:
+  max_num_steps: 602
+async_rl:
+  sampler:
+    max_lookahead_versions: 0
+checkpointing:
+  enabled: false
+  load_replay_buffer: false
+  checkpoint_must_save_by: null
+logger:
+  wandb_enabled: false
+loss_fn:
+  enable_torch_compile: false
