@@ -95,6 +95,8 @@ class VllmSpecificArgs(TypedDict):
     quantization_ignore_patterns: NotRequired[list[str]]
     kv_cache_dtype: Literal["auto", "fp8", "fp8_e4m3", "fp8_ds_mla"]
     enforce_eager: NotRequired[bool]
+    # Omitted or None keeps the worker's CUDA-capability-based default.
+    enable_prefix_caching: NotRequired[bool | None]
     enable_return_routed_experts: NotRequired[bool]
     # Collect vLLM request, cache, and cumulative token counters in a model-owner
     # background thread for performance diagnostics.

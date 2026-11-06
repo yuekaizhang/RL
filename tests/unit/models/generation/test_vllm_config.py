@@ -16,13 +16,33 @@ from types import SimpleNamespace
 from typing import cast
 
 import pytest
+from pydantic import TypeAdapter
 
 from nemo_rl.models.generation import configure_generation_config
 from nemo_rl.models.generation.interfaces import GenerationConfig
 from nemo_rl.models.generation.vllm.config import (
     VllmConfig,
+    VllmSpecificArgs,
     validate_vllm_quantization_config,
 )
+
+
+@pytest.mark.parametrize("prefix_cache", [False, True, None])
+def test_prefix_cache_config_survives_typed_validation(prefix_cache):
+    raw = {
+        "tensor_parallel_size": 1,
+        "pipeline_parallel_size": 1,
+        "expert_parallel_size": 1,
+        "gpu_memory_utilization": 0.8,
+        "max_model_len": 128,
+        "skip_tokenizer_init": False,
+        "async_engine": True,
+        "kv_cache_dtype": "auto",
+        "enable_prefix_caching": prefix_cache,
+    }
+    parsed = TypeAdapter(VllmSpecificArgs).validate_python(raw)
+    assert "enable_prefix_caching" in parsed
+    assert parsed["enable_prefix_caching"] is prefix_cache
 
 
 @pytest.mark.parametrize(
