@@ -187,3 +187,41 @@ optimizer update. The scalar logs do not identify the responsible tokens or
 their cause. See `policy-kl-spike-summary.json` for the measurements.
 The monitor reports any recent `policy_kl_error > 0.01` once per case and event
 step. This is a warning only and does not cancel training or change the recipe.
+
+### Completed 600-step comparison (2026-11-07)
+
+Both cases completed all 600 updates and saved full step600 checkpoints.
+Final allocations 21388474 (LA0) and 21388476 (LA1) exited `COMPLETED/0:0`.
+Native logs cover steps 1–600 without gaps; the resumed steps 301–600 retain
+LR 1e-6, lags 0/1, 32 valid samples and zero dropped or logprob-masked samples.
+Each final checkpoint has 16 nonempty distributed shards plus optimizer,
+scheduler, dataloader and replay/data-plane artifacts. The original300
+checkpoints and stop marker are preserved.
+
+| Last 100 updates (501–600), mean | LA0 | LA1 |
+| --- | ---: | ---: |
+| `gen_kl_error` | 0.0010509903 | 0.0010856372 |
+| Training reward | 0.6609375 | 0.6459375 |
+| Native step time, seconds | 134.1086 | 68.5688 |
+
+The late generation KL means differ by about 3.3%. Neither MCore trajectory
+reproduces the historical AutoModel LA1's sustained higher generation KL
+(last100 mean 0.0025577830). These are single-seed, independently sampled
+training trajectories; this comparison does not establish algorithmic
+equivalence, identify a unique AutoModel defect, or isolate a kernel cause.
+Finite reverse-KL events occurred at LA0 steps384/588 and LA1 steps511/563;
+each returned near baseline on the following step. They were warnings only.
+
+The final plot is `results/comparison-to600.png`; the complete native histories
+are `results/la{0,1}-history-to600.json`. See
+[`completion-to600-summary.json`](completion-to600-summary.json) for the compact
+audit and local `results/completion-to600.json` for detailed evidence.
+The original W&B runs remain [LA0](https://wandb.ai/yuekaiz/nemo-rl-automodel-sc/runs/yuekaiz4963mc0s42)
+and [LA1](https://wandb.ai/yuekaiz/nemo-rl-automodel-sc/runs/yuekaiz4963mc1s42).
+
+The monitor wrote `results/stop-to600-watch` and exited normally. Unused LA1
+segments21388478/21388479 were cancelled before starting; no MCore allocation
+remains queued or running. Delayed notifications do not require a restart.
+AutoModel900 jobs21315214/21315216/21315217 remain `JobHeldUser`. Existing
+fixed-token and single-layer diagnostic jobs21392111/21398471/21398928 completed
+successfully; their scientific limits remain in `../kl_diagnosis/HANDOFF.md`.

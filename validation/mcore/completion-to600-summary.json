@@ -1,0 +1,368 @@
+{
+  "status": "verified_both_completed600",
+  "target_steps": 600,
+  "comparison_plot": "validation/mcore/results/comparison-to600.png",
+  "comparison_summary": "validation/mcore/results/comparison-to600-summary.json",
+  "observed_at": "2026-11-07T03:23:18.927668-08:00",
+  "source_manifest": "validation/mcore/slurm/submitted.tsv",
+  "continuation_manifest": "validation/mcore/slurm/submitted-to600.tsv",
+  "detailed_local_report": "validation/mcore/results/completion-to600.json",
+  "cases": {
+    "0": {
+      "lookahead": 0,
+      "job_id": "21388474",
+      "slurm_state": "COMPLETED",
+      "slurm_exit_code": "0:0",
+      "native_steps": 600,
+      "missing_steps": [],
+      "bad": [],
+      "resumed301_to600_lr_all_1e_6_and_lag_exact": true,
+      "historical_lag0_steps": [],
+      "checkpoint": "validation/mcore/results/yuekaiz-mcore-la0-600/checkpoints/step_600",
+      "training_info": {
+        "consumed_samples": 4800,
+        "current_step": 600,
+        "current_epoch": 0,
+        "total_steps": 600,
+        "total_valid_tokens": 24072656.0,
+        "trainer_version": 600,
+        "sampler_name": "in_order",
+        "sampler_dispatch_index": 600,
+        "cur_adaptive_ppo_clip_k": null
+      },
+      "nonempty_distcp_shards": 16,
+      "distcp_total_bytes": 417003973992,
+      "restore_artifacts": [
+        "train_dataloader.pt",
+        "replay_buffer_metadata.pt",
+        "data_plane/metadata.json",
+        "policy/weights/iter_0000000/train_state.pt",
+        "policy/weights/iter_0000000/.metadata"
+      ],
+      "native_history": "validation/mcore/results/la0-history-to600.json",
+      "policy_kl_spikes": [
+        [
+          384,
+          2.3936800050924134
+        ],
+        [
+          588,
+          0.034862084071831
+        ]
+      ],
+      "summary": {
+        "all600": {
+          "gen_kl_error": {
+            "n": 600,
+            "mean": 0.0009993146927781652,
+            "max": 0.0017230103946099644
+          },
+          "policy_kl_error": {
+            "n": 600,
+            "mean": 0.005100631632439182,
+            "max": 2.3936800050924134
+          },
+          "reward": {
+            "n": 600,
+            "mean": 0.5565625,
+            "max": 0.96875
+          },
+          "timing/train/total_step_time": {
+            "n": 600,
+            "mean": 133.49928333333332,
+            "max": 276.74
+          }
+        },
+        "resumed301_to600": {
+          "gen_kl_error": {
+            "n": 300,
+            "mean": 0.0010746654942379154,
+            "max": 0.0017230103946099644
+          },
+          "policy_kl_error": {
+            "n": 300,
+            "mean": 0.009226935354233752,
+            "max": 2.3936800050924134
+          },
+          "reward": {
+            "n": 300,
+            "mean": 0.6357291666666667,
+            "max": 0.96875
+          },
+          "timing/train/total_step_time": {
+            "n": 300,
+            "mean": 133.46543333333332,
+            "max": 276.74
+          }
+        },
+        "last100": {
+          "gen_kl_error": {
+            "n": 100,
+            "mean": 0.0010509903417417975,
+            "max": 0.0014291214657862626
+          },
+          "policy_kl_error": {
+            "n": 100,
+            "mean": 0.001501876853065602,
+            "max": 0.034862084071831
+          },
+          "reward": {
+            "n": 100,
+            "mean": 0.6609375,
+            "max": 0.96875
+          },
+          "timing/train/total_step_time": {
+            "n": 100,
+            "mean": 134.1086,
+            "max": 250.67
+          }
+        },
+        "last20": {
+          "gen_kl_error": {
+            "n": 20,
+            "mean": 0.001012013128793569,
+            "max": 0.0012446999044986931
+          },
+          "policy_kl_error": {
+            "n": 20,
+            "mean": 0.0027542208616435386,
+            "max": 0.034862084071831
+          },
+          "reward": {
+            "n": 20,
+            "mean": 0.665625,
+            "max": 0.96875
+          },
+          "timing/train/total_step_time": {
+            "n": 20,
+            "mean": 140.1035,
+            "max": 250.67
+          }
+        }
+      },
+      "final_native_metrics": {
+        "nemo_rl/step": 600,
+        "gen_kl_error": 0.0009932879980742912,
+        "policy_kl_error": 0.001044446502846206,
+        "lr": 1e-06,
+        "weight_version_lag": 0,
+        "num_valid_samples": 32.0,
+        "global_valid_toks": 34049.0,
+        "dropped_prompt_groups": 0,
+        "num_masked_seqs_by_logprob_error": 0
+      },
+      "wandb_run": "https://wandb.ai/yuekaiz/nemo-rl-automodel-sc/runs/yuekaiz4963mc0s42",
+      "preserved_checkpoint300": {
+        "path": "validation/mcore/results/yuekaiz-mcore-la0-300/checkpoints/step_300",
+        "training_info": {
+          "consumed_samples": 2400,
+          "current_step": 300,
+          "current_epoch": 0,
+          "total_steps": 300,
+          "total_valid_tokens": 13402369.0,
+          "trainer_version": 300,
+          "sampler_name": "in_order",
+          "sampler_dispatch_index": 300,
+          "cur_adaptive_ppo_clip_k": null
+        },
+        "nonempty_distcp_shards": 16,
+        "newest_file_mtime": "2026-11-05T17:17:24-08:00"
+      }
+    },
+    "1": {
+      "lookahead": 1,
+      "job_id": "21388476",
+      "slurm_state": "COMPLETED",
+      "slurm_exit_code": "0:0",
+      "native_steps": 600,
+      "missing_steps": [],
+      "bad": [],
+      "resumed301_to600_lr_all_1e_6_and_lag_exact": true,
+      "historical_lag0_steps": [
+        {
+          "step": 1,
+          "job": "21318168"
+        },
+        {
+          "step": 11,
+          "job": "21326851"
+        }
+      ],
+      "checkpoint": "validation/mcore/results/yuekaiz-mcore-la1-600/checkpoints/step_600",
+      "training_info": {
+        "consumed_samples": 4800,
+        "current_step": 600,
+        "current_epoch": 0,
+        "total_steps": 600,
+        "total_valid_tokens": 24737800.0,
+        "trainer_version": 600,
+        "sampler_name": "in_order",
+        "sampler_dispatch_index": 601,
+        "cur_adaptive_ppo_clip_k": null
+      },
+      "nonempty_distcp_shards": 16,
+      "distcp_total_bytes": 417003973992,
+      "restore_artifacts": [
+        "train_dataloader.pt",
+        "replay_buffer_metadata.pt",
+        "data_plane/metadata.json",
+        "policy/weights/iter_0000000/train_state.pt",
+        "policy/weights/iter_0000000/.metadata"
+      ],
+      "native_history": "validation/mcore/results/la1-history-to600.json",
+      "policy_kl_spikes": [
+        [
+          511,
+          0.04100010012294933
+        ],
+        [
+          563,
+          0.08260500893613153
+        ]
+      ],
+      "summary": {
+        "all600": {
+          "gen_kl_error": {
+            "n": 600,
+            "mean": 0.001039678965684761,
+            "max": 0.0017038810948438862
+          },
+          "policy_kl_error": {
+            "n": 600,
+            "mean": 0.001284714611058469,
+            "max": 0.08260500893613153
+          },
+          "reward": {
+            "n": 600,
+            "mean": 0.5511458333333333,
+            "max": 1.0
+          },
+          "timing/train/total_step_time": {
+            "n": 600,
+            "mean": 70.37323333333333,
+            "max": 255.13
+          }
+        },
+        "resumed301_to600": {
+          "gen_kl_error": {
+            "n": 300,
+            "mean": 0.0010761493540319535,
+            "max": 0.0015701675630261829
+          },
+          "policy_kl_error": {
+            "n": 300,
+            "mean": 0.0015284070197362628,
+            "max": 0.08260500893613153
+          },
+          "reward": {
+            "n": 300,
+            "mean": 0.645625,
+            "max": 0.96875
+          },
+          "timing/train/total_step_time": {
+            "n": 300,
+            "mean": 69.97436666666667,
+            "max": 251.97
+          }
+        },
+        "last100": {
+          "gen_kl_error": {
+            "n": 100,
+            "mean": 0.0010856372119310794,
+            "max": 0.0014278794957054341
+          },
+          "policy_kl_error": {
+            "n": 100,
+            "mean": 0.0023517739593361493,
+            "max": 0.08260500893613153
+          },
+          "reward": {
+            "n": 100,
+            "mean": 0.6459375,
+            "max": 0.9375
+          },
+          "timing/train/total_step_time": {
+            "n": 100,
+            "mean": 68.5688,
+            "max": 80.16
+          }
+        },
+        "last20": {
+          "gen_kl_error": {
+            "n": 20,
+            "mean": 0.001102556202944611,
+            "max": 0.0014278794957054341
+          },
+          "policy_kl_error": {
+            "n": 20,
+            "mean": 0.001221475624917034,
+            "max": 0.002845613694994696
+          },
+          "reward": {
+            "n": 20,
+            "mean": 0.6734375,
+            "max": 0.875
+          },
+          "timing/train/total_step_time": {
+            "n": 20,
+            "mean": 68.432,
+            "max": 79.75
+          }
+        }
+      },
+      "final_native_metrics": {
+        "nemo_rl/step": 600,
+        "gen_kl_error": 0.0010116653732666178,
+        "policy_kl_error": 0.001033819115121006,
+        "lr": 1e-06,
+        "weight_version_lag": 1,
+        "num_valid_samples": 32.0,
+        "global_valid_toks": 34693.0,
+        "dropped_prompt_groups": 0,
+        "num_masked_seqs_by_logprob_error": 0
+      },
+      "wandb_run": "https://wandb.ai/yuekaiz/nemo-rl-automodel-sc/runs/yuekaiz4963mc1s42",
+      "preserved_checkpoint300": {
+        "path": "validation/mcore/results/yuekaiz-mcore-la1-300/checkpoints/step_300",
+        "training_info": {
+          "consumed_samples": 2400,
+          "current_step": 300,
+          "current_epoch": 0,
+          "total_steps": 300,
+          "total_valid_tokens": 14277443.0,
+          "trainer_version": 300,
+          "sampler_name": "in_order",
+          "sampler_dispatch_index": 301,
+          "cur_adaptive_ppo_clip_k": null
+        },
+        "nonempty_distcp_shards": 16,
+        "newest_file_mtime": "2026-11-05T07:55:55-08:00"
+      }
+    }
+  },
+  "cleanup": {
+    "verified_at": "2026-11-07T03:23:18.927668-08:00",
+    "monitor_pid": 3973040,
+    "monitor_exited_normally": true,
+    "active_mcore_allocations": [],
+    "unused_followers_cancelled": [
+      "21388478",
+      "21388479"
+    ],
+    "old_900_jobs": {
+      "21315214": "JobHeldUser",
+      "21315216": "JobHeldUser",
+      "21315217": "JobHeldUser"
+    },
+    "stop300_retained": true,
+    "stop600_written": true,
+    "new_crontab_installed_for600": false
+  },
+  "interpretation": [
+    "MCore LA0/LA1 late generation KL remains close; this does not reproduce the historical AutoModel LA1 sustained excess.",
+    "Single-seed independent training trajectories do not establish algorithmic equivalence or identify a unique backend/kernel cause.",
+    "Reverse policy-KL spikes are opposite-direction unclamped K3 diagnostics, not updated-policy KL; scalars alone do not locate the outlier tokens."
+  ],
+  "last100_gen_kl_la1_over_la0": 1.0329659263394009,
+  "last100_step_time_la0_over_la1": 1.9558253899732823
+}
