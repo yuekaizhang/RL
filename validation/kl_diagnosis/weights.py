@@ -12,6 +12,46 @@ from validation.kl_diagnosis.sampling import sample_tensor
 
 
 class ProbeExtension(VllmInternalWorkerExtension):
+    def diagnostic_conv_precision(self, restore=False):
+        """Change only GDN prefill-conv product precision in this diagnostic process."""
+        import hashlib
+
+        from vllm.model_executor.layers.mamba.gdn import qwen_gdn_linear_attn
+        from vllm.model_executor.layers.mamba.ops import causal_conv1d
+        from validation.kl_diagnosis.conv_patch import fp32_product_kernel
+
+        assert self.model_config.enforce_eager
+        if restore:
+            original, forward = self._diag_conv_original
+            causal_conv1d._causal_conv1d_fwd_kernel = original
+            qwen_gdn_linear_attn.causal_conv1d_fn = forward
+            self._diag_conv_original = None
+            return {
+                "rank": torch.distributed.get_rank(),
+                "restored": True,
+                "patched_conv_calls": self._diag_conv_calls,
+                "source_sha256": hashlib.sha256(original.src.encode()).hexdigest(),
+            }
+        assert getattr(self, "_diag_conv_original", None) is None
+        original = causal_conv1d._causal_conv1d_fwd_kernel
+        forward = qwen_gdn_linear_attn.causal_conv1d_fn
+        modified = fp32_product_kernel(original)
+        self._diag_conv_original = original, forward
+        self._diag_conv_calls = 0
+
+        def counted_conv(*args, **kwargs):
+            self._diag_conv_calls += 1
+            return forward(*args, **kwargs)
+
+        causal_conv1d._causal_conv1d_fwd_kernel = modified
+        qwen_gdn_linear_attn.causal_conv1d_fn = counted_conv
+        return {
+            "rank": torch.distributed.get_rank(),
+            "gdn_layers": len(self._diagnostic_gdn_layers()),
+            "original_source_sha256": hashlib.sha256(original.src.encode()).hexdigest(),
+            "patched_source_sha256": hashlib.sha256(modified.src.encode()).hexdigest(),
+        }
+
     def diagnostic_probe_status(self):
         return {"probe": "ProbeExtension", "rank": torch.distributed.get_rank()}
 

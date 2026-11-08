@@ -1,0 +1,5 @@
+--- a/vllm/model_executor/layers/mamba/ops/causal_conv1d.py
++++ b/vllm/model_executor/layers/mamba/ops/causal_conv1d.py
+@@ -455 +455 @@
+-            acc += matrix_x * matrix_w  # [BLOCK_N]
++            acc += matrix_x.to(tl.float32) * matrix_w.to(tl.float32)  # [BLOCK_N]

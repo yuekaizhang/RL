@@ -1,0 +1,718 @@
+{
+  "status": "completed",
+  "scope": "First complete GDN component only, original checkpoint600 weights and R14 sequence0 token prefix. No full model, training, TP8 collectives or checkpoint writes.",
+  "generation_scope": "Actual pinned vLLM conv/post-conv/FlashInfer/gated-norm kernels; F.linear reconstructs fused qkvz/ba projections. TP8-shaped slices execute sequentially on ONE GPU with a local sum, not actual TP8 linear classes or NCCL collectives. All pipelines share the saved policy input to separate local from propagated differences. No full model or training.",
+  "tokens": 677,
+  "token_sha256": "d0f89487ba680e456fd6627bd23e52cbe84def6a41ee638335a5c0976a7a8dc0",
+  "policy_primitive": "fla.ops.gated_delta_rule.chunk.chunk_gated_delta_rule",
+  "policy_conv": "causal_conv1d.causal_conv1d_interface.causal_conv1d_fn",
+  "cpu_projection_fp32_vs_fp64": {
+    "qkv": {
+      "shape": [
+        1,
+        16,
+        8192
+      ],
+      "actual_dtype": "torch.float32",
+      "reference_dtype": "torch.float64",
+      "relative_rms_delta": 1.1750689481146186e-07,
+      "max_abs_delta": 9.856943506747484e-06,
+      "nonidentical_fraction": 0.9967269897460938
+    },
+    "z": {
+      "shape": [
+        1,
+        16,
+        4096
+      ],
+      "actual_dtype": "torch.float32",
+      "reference_dtype": "torch.float64",
+      "relative_rms_delta": 1.390503672073189e-07,
+      "max_abs_delta": 7.429043762385845e-06,
+      "nonidentical_fraction": 0.9998016357421875
+    },
+    "b": {
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "actual_dtype": "torch.float32",
+      "reference_dtype": "torch.float64",
+      "relative_rms_delta": 7.984937670679786e-08,
+      "max_abs_delta": 8.448841981589794e-07,
+      "nonidentical_fraction": 1.0
+    },
+    "a": {
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "actual_dtype": "torch.float32",
+      "reference_dtype": "torch.float64",
+      "relative_rms_delta": 1.0999849049021111e-07,
+      "max_abs_delta": 1.9617582438513637e-06,
+      "nonidentical_fraction": 1.0
+    }
+  },
+  "policy_repeat_output": [
+    {
+      "shape": [
+        1,
+        677,
+        2048
+      ],
+      "actual_dtype": "torch.bfloat16",
+      "reference_dtype": "torch.bfloat16",
+      "relative_rms_delta": 0.0,
+      "max_abs_delta": 0.0,
+      "nonidentical_fraction": 0.0
+    },
+    {
+      "shape": [
+        1,
+        677,
+        2048
+      ],
+      "actual_dtype": "torch.bfloat16",
+      "reference_dtype": "torch.bfloat16",
+      "relative_rms_delta": 0.0,
+      "max_abs_delta": 0.0,
+      "nonidentical_fraction": 0.0
+    }
+  ],
+  "input_norm_vllm_vs_policy": {
+    "shape": [
+      677,
+      2048
+    ],
+    "actual_dtype": "torch.bfloat16",
+    "reference_dtype": "torch.bfloat16",
+    "relative_rms_delta": 0.0,
+    "max_abs_delta": 0.0,
+    "nonidentical_fraction": 0.0
+  },
+  "equal_input_controls": {
+    "bf16_dt": {
+      "q_vs_policy": {
+        "shape": [
+          677,
+          16,
+          128
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 5.4408796184218e-06,
+        "max_abs_delta": 0.00048828125,
+        "nonidentical_fraction": 5.048698301329394e-06
+      },
+      "k_vs_policy": {
+        "shape": [
+          677,
+          16,
+          128
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 2.0179488221335184e-05,
+        "max_abs_delta": 0.001953125,
+        "nonidentical_fraction": 5.048698301329394e-06
+      },
+      "v_vs_policy": {
+        "shape": [
+          677,
+          32,
+          128
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      },
+      "g_vs_policy": {
+        "shape": [
+          677,
+          32
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.float32",
+        "relative_rms_delta": 3.2781551813033333e-05,
+        "max_abs_delta": 0.0035552978515625,
+        "nonidentical_fraction": 1.0
+      },
+      "beta_vs_policy": {
+        "shape": [
+          677,
+          32
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0013867784035064463,
+        "max_abs_delta": 0.001953125,
+        "nonidentical_fraction": 1.0
+      },
+      "g_vs_cpu_fp64_full_precision_params": {
+        "shape": [
+          677,
+          32
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.float64",
+        "relative_rms_delta": 3.279156878735782e-05,
+        "max_abs_delta": 0.003561140399895635,
+        "nonidentical_fraction": 1.0
+      },
+      "beta_vs_cpu_fp64": {
+        "shape": [
+          677,
+          32
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.float64",
+        "relative_rms_delta": 4.1598371124615516e-08,
+        "max_abs_delta": 8.382904814752123e-08,
+        "nonidentical_fraction": 1.0
+      }
+    },
+    "fp32_dt": {
+      "q_vs_policy": {
+        "shape": [
+          677,
+          16,
+          128
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 5.4408796184218e-06,
+        "max_abs_delta": 0.00048828125,
+        "nonidentical_fraction": 5.048698301329394e-06
+      },
+      "k_vs_policy": {
+        "shape": [
+          677,
+          16,
+          128
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 2.0179488221335184e-05,
+        "max_abs_delta": 0.001953125,
+        "nonidentical_fraction": 5.048698301329394e-06
+      },
+      "v_vs_policy": {
+        "shape": [
+          677,
+          32,
+          128
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      },
+      "g_vs_policy": {
+        "shape": [
+          677,
+          32
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.float32",
+        "relative_rms_delta": 1.731726530309056e-07,
+        "max_abs_delta": 2.288818359375e-05,
+        "nonidentical_fraction": 0.903942023633678
+      },
+      "beta_vs_policy": {
+        "shape": [
+          677,
+          32
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0013867784035064463,
+        "max_abs_delta": 0.001953125,
+        "nonidentical_fraction": 1.0
+      },
+      "g_vs_cpu_fp64_full_precision_params": {
+        "shape": [
+          677,
+          32
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.float64",
+        "relative_rms_delta": 1.6686325001210922e-07,
+        "max_abs_delta": 2.1152953934233665e-05,
+        "nonidentical_fraction": 1.0
+      },
+      "beta_vs_cpu_fp64": {
+        "shape": [
+          677,
+          32
+        ],
+        "actual_dtype": "torch.float32",
+        "reference_dtype": "torch.float64",
+        "relative_rms_delta": 4.1598371124615516e-08,
+        "max_abs_delta": 8.382904814752123e-08,
+        "nonidentical_fraction": 1.0
+      }
+    },
+    "flashinfer_shared_policy_inputs_vs_policy_core": {
+      "shape": [
+        677,
+        32,
+        128
+      ],
+      "actual_dtype": "torch.bfloat16",
+      "reference_dtype": "torch.bfloat16",
+      "relative_rms_delta": 0.001952897188226696,
+      "max_abs_delta": 0.015625,
+      "nonidentical_fraction": 0.4050206419636263
+    },
+    "vllm_norm_shared_policy_core_z_vs_policy_norm": {
+      "shape": [
+        21664,
+        128
+      ],
+      "actual_dtype": "torch.bfloat16",
+      "reference_dtype": "torch.bfloat16",
+      "relative_rms_delta": 2.276885403429562e-06,
+      "max_abs_delta": 6.103515625e-05,
+      "nonidentical_fraction": 9.015532680945348e-06
+    }
+  },
+  "pipelines": {
+    "tp1_bf16_dt": {
+      "versus_policy": {
+        "qkv": {
+          "shape": [
+            677,
+            8192
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "z": {
+          "shape": [
+            677,
+            4096
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "a": {
+          "shape": [
+            677,
+            32
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "b": {
+          "shape": [
+            677,
+            32
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "conv": {
+          "shape": [
+            677,
+            8192
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0021622607677060173,
+          "max_abs_delta": 0.125,
+          "nonidentical_fraction": 0.29462796863460117
+        },
+        "v": {
+          "shape": [
+            677,
+            32,
+            128
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.002158593652230204,
+          "max_abs_delta": 0.125,
+          "nonidentical_fraction": 0.2724980814946455
+        },
+        "g": {
+          "shape": [
+            677,
+            32
+          ],
+          "actual_dtype": "torch.float32",
+          "reference_dtype": "torch.float32",
+          "relative_rms_delta": 3.2781551813033333e-05,
+          "max_abs_delta": 0.0035552978515625,
+          "nonidentical_fraction": 1.0
+        },
+        "beta": {
+          "shape": [
+            677,
+            32
+          ],
+          "actual_dtype": "torch.float32",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0013867784035064463,
+          "max_abs_delta": 0.001953125,
+          "nonidentical_fraction": 1.0
+        },
+        "core": {
+          "shape": [
+            677,
+            32,
+            128
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.002600394443566605,
+          "max_abs_delta": 0.015625,
+          "nonidentical_fraction": 0.549005550683161
+        },
+        "norm": {
+          "shape": [
+            677,
+            4096
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0010598610693653635,
+          "max_abs_delta": 0.015625,
+          "nonidentical_fraction": 0.5607960643233013
+        },
+        "output": {
+          "shape": [
+            677,
+            2048
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0024973719071720094,
+          "max_abs_delta": 0.00390625,
+          "nonidentical_fraction": 0.6868112133031757
+        }
+      },
+      "repeat_output": {
+        "shape": [
+          677,
+          2048
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      }
+    },
+    "tp8_shaped_bf16_dt": {
+      "versus_policy": {
+        "qkv": {
+          "shape": [
+            677,
+            8192
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "z": {
+          "shape": [
+            677,
+            4096
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "a": {
+          "shape": [
+            677,
+            32
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "b": {
+          "shape": [
+            677,
+            32
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "conv": {
+          "shape": [
+            677,
+            8192
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0021622607677060173,
+          "max_abs_delta": 0.125,
+          "nonidentical_fraction": 0.29462796863460117
+        },
+        "v": {
+          "shape": [
+            677,
+            32,
+            128
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.002158593652230204,
+          "max_abs_delta": 0.125,
+          "nonidentical_fraction": 0.2724980814946455
+        },
+        "g": {
+          "shape": [
+            677,
+            32
+          ],
+          "actual_dtype": "torch.float32",
+          "reference_dtype": "torch.float32",
+          "relative_rms_delta": 3.2781551813033333e-05,
+          "max_abs_delta": 0.0035552978515625,
+          "nonidentical_fraction": 1.0
+        },
+        "beta": {
+          "shape": [
+            677,
+            32
+          ],
+          "actual_dtype": "torch.float32",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0013867784035064463,
+          "max_abs_delta": 0.001953125,
+          "nonidentical_fraction": 1.0
+        },
+        "core": {
+          "shape": [
+            677,
+            32,
+            128
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0025805766495958014,
+          "max_abs_delta": 0.015625,
+          "nonidentical_fraction": 0.549234545213257
+        },
+        "norm": {
+          "shape": [
+            677,
+            4096
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0010605198506848143,
+          "max_abs_delta": 0.015625,
+          "nonidentical_fraction": 0.5607920974889217
+        },
+        "output": {
+          "shape": [
+            677,
+            2048
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.003013970778737603,
+          "max_abs_delta": 0.00390625,
+          "nonidentical_fraction": 0.7007939438700148
+        }
+      },
+      "repeat_output": {
+        "shape": [
+          677,
+          2048
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      }
+    },
+    "tp8_shaped_fp32_dt": {
+      "versus_policy": {
+        "qkv": {
+          "shape": [
+            677,
+            8192
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "z": {
+          "shape": [
+            677,
+            4096
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "a": {
+          "shape": [
+            677,
+            32
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "b": {
+          "shape": [
+            677,
+            32
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0,
+          "max_abs_delta": 0.0,
+          "nonidentical_fraction": 0.0
+        },
+        "conv": {
+          "shape": [
+            677,
+            8192
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0021622607677060173,
+          "max_abs_delta": 0.125,
+          "nonidentical_fraction": 0.29462796863460117
+        },
+        "v": {
+          "shape": [
+            677,
+            32,
+            128
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.002158593652230204,
+          "max_abs_delta": 0.125,
+          "nonidentical_fraction": 0.2724980814946455
+        },
+        "g": {
+          "shape": [
+            677,
+            32
+          ],
+          "actual_dtype": "torch.float32",
+          "reference_dtype": "torch.float32",
+          "relative_rms_delta": 1.731726530309056e-07,
+          "max_abs_delta": 2.288818359375e-05,
+          "nonidentical_fraction": 0.903942023633678
+        },
+        "beta": {
+          "shape": [
+            677,
+            32
+          ],
+          "actual_dtype": "torch.float32",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0013867784035064463,
+          "max_abs_delta": 0.001953125,
+          "nonidentical_fraction": 1.0
+        },
+        "core": {
+          "shape": [
+            677,
+            32,
+            128
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0026190672354013417,
+          "max_abs_delta": 0.015625,
+          "nonidentical_fraction": 0.5491836976089365
+        },
+        "norm": {
+          "shape": [
+            677,
+            4096
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0010632163793074649,
+          "max_abs_delta": 0.015625,
+          "nonidentical_fraction": 0.5612810999815362
+        },
+        "output": {
+          "shape": [
+            677,
+            2048
+          ],
+          "actual_dtype": "torch.bfloat16",
+          "reference_dtype": "torch.bfloat16",
+          "relative_rms_delta": 0.0030213260181978377,
+          "max_abs_delta": 0.00390625,
+          "nonidentical_fraction": 0.700713885939808
+        }
+      },
+      "repeat_output": {
+        "shape": [
+          677,
+          2048
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      }
+    }
+  },
+  "dt_precision_only_tp8_output_effect": {
+    "shape": [
+      677,
+      2048
+    ],
+    "actual_dtype": "torch.bfloat16",
+    "reference_dtype": "torch.bfloat16",
+    "relative_rms_delta": 0.0011474408346080457,
+    "max_abs_delta": 0.00390625,
+    "nonidentical_fraction": 0.33689963764771047
+  },
+  "job": {
+    "id": 21509317,
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed": "00:03:20"
+  }
+}

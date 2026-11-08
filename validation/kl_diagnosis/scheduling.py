@@ -8,8 +8,16 @@ import torch
 
 
 async def score_scheduling(
-    worker, sequences, reset, score_one, root, *, serial_kernel_ab=False
+    worker,
+    sequences,
+    reset,
+    score_one,
+    root,
+    *,
+    serial_kernel_ab=False,
+    conv_precision_ab=False,
 ):
+    assert not (serial_kernel_ab and conv_precision_ab)
     modes = (
         {
             "flashinfer_serial1": 1,
@@ -19,6 +27,12 @@ async def score_scheduling(
         if serial_kernel_ab
         else {"serial1": 1, "microbatch4": 4, "concurrent32": 32}
     )
+    if conv_precision_ab:
+        modes = {
+            "original_serial1": 1,
+            "fp32_conv_serial1": 1,
+            "restored_conv_serial1": 1,
+        }
     started = time.monotonic()
     initial_requests = worker.llm.get_num_unfinished_requests()
     while True:
@@ -86,7 +100,35 @@ async def score_scheduling(
         )
 
     try:
-        if serial_kernel_ab:
+        if conv_precision_ab:
+            controls = {}
+            path = root / "conv-precision-controls.json"
+            await run("original_serial1")
+            for _ in range(3):
+                await record("original_serial1")
+            try:
+                controls["switched"] = await worker.llm.collective_rpc(
+                    "diagnostic_conv_precision"
+                )
+                controls["patched_profile"] = await worker.llm.collective_rpc(
+                    "diagnostic_execution_status"
+                )
+                path.write_text(json.dumps(controls, indent=2) + "\n")
+                await run("fp32_conv_serial1")
+                for _ in range(3):
+                    await record("fp32_conv_serial1")
+            finally:
+                controls["restored"] = await worker.llm.collective_rpc(
+                    "diagnostic_conv_precision", kwargs={"restore": True}
+                )
+                controls["restored_profile"] = await worker.llm.collective_rpc(
+                    "diagnostic_execution_status"
+                )
+                path.write_text(json.dumps(controls, indent=2) + "\n")
+            await run("restored_conv_serial1")
+            for _ in range(3):
+                await record("restored_conv_serial1")
+        elif serial_kernel_ab:
             controls = {}
             path = root / "serial-kernel-controls.json"
             await run("flashinfer_serial1")

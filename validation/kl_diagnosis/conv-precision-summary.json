@@ -1,0 +1,379 @@
+{
+  "job": {
+    "id": 21509601,
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed": "00:02:38"
+  },
+  "source_component_job": 21509317,
+  "status": "completed",
+  "scope": "Same saved first-layer projected BF16 inputs/weights; only explicit FP32 product casts in the pinned vLLM prefill-conv JIT. Local diagnostic replacement restored afterwards; no production/image/checkpoint modification or full-model KL.",
+  "patch": {
+    "before": "acc += matrix_x * matrix_w",
+    "after": "acc += matrix_x.to(tl.float32) * matrix_w.to(tl.float32)"
+  },
+  "cases": {
+    "policy_pre": {
+      "vs_fp64": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.float64",
+        "relative_rms_delta": 0.001650948162589402,
+        "max_abs_delta": 0.0625,
+        "nonidentical_fraction": 0.9981191795721012
+      },
+      "vs_fp64_rounded_bf16": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 8.998974462042321e-09,
+        "max_abs_delta": 1.52587890625e-05,
+        "nonidentical_fraction": 1.0818639217134417e-06
+      },
+      "vs_bf16_product_reference_rounded_bf16": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0021755545685920655,
+        "max_abs_delta": 0.125,
+        "nonidentical_fraction": 0.29543233446039513
+      },
+      "vs_policy": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      }
+    },
+    "vllm_original_pre": {
+      "vs_fp64": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.float64",
+        "relative_rms_delta": 0.001960622230959785,
+        "max_abs_delta": 0.095672607421875,
+        "nonidentical_fraction": 0.9994608711456795
+      },
+      "vs_fp64_rounded_bf16": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0021755156683265285,
+        "max_abs_delta": 0.125,
+        "nonidentical_fraction": 0.2954326950817024
+      },
+      "vs_bf16_product_reference_rounded_bf16": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      },
+      "vs_policy": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.002175515668248775,
+        "max_abs_delta": 0.125,
+        "nonidentical_fraction": 0.29543233446039513
+      }
+    },
+    "vllm_fp32_product_pre": {
+      "vs_fp64": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.float64",
+        "relative_rms_delta": 0.001650948162589402,
+        "max_abs_delta": 0.0625,
+        "nonidentical_fraction": 0.9981191795721012
+      },
+      "vs_fp64_rounded_bf16": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 8.998974462042321e-09,
+        "max_abs_delta": 1.52587890625e-05,
+        "nonidentical_fraction": 1.0818639217134417e-06
+      },
+      "vs_bf16_product_reference_rounded_bf16": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0021755545685920655,
+        "max_abs_delta": 0.125,
+        "nonidentical_fraction": 0.29543233446039513
+      },
+      "vs_policy": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      }
+    },
+    "policy_silu": {
+      "vs_fp64": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.float64",
+        "relative_rms_delta": 0.0016488008580571724,
+        "max_abs_delta": 0.062498938002470084,
+        "nonidentical_fraction": 0.999995311923006
+      },
+      "vs_fp64_rounded_bf16": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 7.235899423329859e-07,
+        "max_abs_delta": 0.0009765625,
+        "nonidentical_fraction": 7.212426144756277e-06
+      },
+      "vs_bf16_product_reference_rounded_bf16": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0021627675024303594,
+        "max_abs_delta": 0.125,
+        "nonidentical_fraction": 0.29462760801329396
+      },
+      "vs_policy": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      }
+    },
+    "vllm_original_silu": {
+      "vs_fp64": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.float64",
+        "relative_rms_delta": 0.0019507442210935284,
+        "max_abs_delta": 0.09567435915045763,
+        "nonidentical_fraction": 0.9999960331656204
+      },
+      "vs_fp64_rounded_bf16": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0021622606609007816,
+        "max_abs_delta": 0.125,
+        "nonidentical_fraction": 0.2946263458387186
+      },
+      "vs_bf16_product_reference_rounded_bf16": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 1.1916502106610387e-06,
+        "max_abs_delta": 0.0009765625,
+        "nonidentical_fraction": 2.1637278434268835e-06
+      },
+      "vs_policy": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0021622607677060173,
+        "max_abs_delta": 0.125,
+        "nonidentical_fraction": 0.29462796863460117
+      }
+    },
+    "vllm_fp32_product_silu": {
+      "vs_fp64": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.float64",
+        "relative_rms_delta": 0.0016488008580571724,
+        "max_abs_delta": 0.062498938002470084,
+        "nonidentical_fraction": 0.999995311923006
+      },
+      "vs_fp64_rounded_bf16": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 7.235899423329859e-07,
+        "max_abs_delta": 0.0009765625,
+        "nonidentical_fraction": 7.212426144756277e-06
+      },
+      "vs_bf16_product_reference_rounded_bf16": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0021627675024303594,
+        "max_abs_delta": 0.125,
+        "nonidentical_fraction": 0.29462760801329396
+      },
+      "vs_policy": {
+        "shape": [
+          677,
+          8192
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0,
+        "max_abs_delta": 0.0,
+        "nonidentical_fraction": 0.0
+      }
+    }
+  },
+  "restored_original_output": {
+    "shape": [
+      677,
+      8192
+    ],
+    "actual_dtype": "torch.bfloat16",
+    "reference_dtype": "torch.bfloat16",
+    "relative_rms_delta": 0.0,
+    "max_abs_delta": 0.0,
+    "nonidentical_fraction": 0.0
+  },
+  "component_output_vs_policy_before_after": {
+    "tp1_bf16_dt": {
+      "before": {
+        "shape": [
+          677,
+          2048
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0024973719071720094,
+        "max_abs_delta": 0.00390625,
+        "nonidentical_fraction": 0.6868112133031757
+      },
+      "after": {
+        "shape": [
+          677,
+          2048
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0020510675814452645,
+        "max_abs_delta": 0.00390625,
+        "nonidentical_fraction": 0.6158899845365583
+      }
+    },
+    "tp8_shaped_bf16_dt": {
+      "before": {
+        "shape": [
+          677,
+          2048
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.003013970778737603,
+        "max_abs_delta": 0.00390625,
+        "nonidentical_fraction": 0.7007939438700148
+      },
+      "after": {
+        "shape": [
+          677,
+          2048
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.002656663990165005,
+        "max_abs_delta": 0.00390625,
+        "nonidentical_fraction": 0.6406091326624815
+      }
+    },
+    "tp8_shaped_fp32_dt": {
+      "before": {
+        "shape": [
+          677,
+          2048
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0030213260181978377,
+        "max_abs_delta": 0.00390625,
+        "nonidentical_fraction": 0.700713885939808
+      },
+      "after": {
+        "shape": [
+          677,
+          2048
+        ],
+        "actual_dtype": "torch.bfloat16",
+        "reference_dtype": "torch.bfloat16",
+        "relative_rms_delta": 0.0026438666645756865,
+        "max_abs_delta": 0.00390625,
+        "nonidentical_fraction": 0.6403704013570901
+      }
+    }
+  },
+  "full_model_kl_effect": "not yet measured; R15 actual EP16/TP8 same-engine A/B next"
+}

@@ -38,6 +38,12 @@ if [[ "${SC_LP_SERIAL_KERNEL_AB:-0}" == 1 ]]; then
   description='EP16 r14: same engine/weights/R9 tokens/policy; serial1 FlashInfer3/Triton3/restored-FlashInfer3; prefix off/chunk2048; two updates'
   export COMMAND="SC_LP_SCHEDULING_AB=1 SC_LP_PREFIX_CACHE_AB=1 SC_LP_SERIAL_KERNEL_AB=1 bash '$PWD/validation/kl_diagnosis/run.sh'"
 fi
+if [[ "${SC_LP_CONV_AB:-0}" == 1 ]]; then
+  [[ "${SC_LP_PREFIX_CACHE_AB:-0}" == 1 && "${SC_LP_SCHEDULING_AB:-0}" == 1 && "${SC_LP_SERIAL_KERNEL_AB:-0}" != 1 ]]
+  job_name=yuekaiz-kl-diagnosis-ep16-r15-conv
+  description='EP16 r15: same engine/checkpoint600/R9 tokens/policy; original3/FP32-conv-product3/restored3; only prefill-conv arithmetic changes, two updates'
+  export COMMAND="SC_LP_SCHEDULING_AB=1 SC_LP_PREFIX_CACHE_AB=1 SC_LP_CONV_AB=1 bash '$PWD/validation/kl_diagnosis/run.sh'"
+fi
 job=$(sbatch --parsable "${dependency[@]}" --nodes=3 --ntasks-per-node=1 --cpus-per-task=128 \
   --gres=gpu:8 --exclusive --account=coreai_dlalgo_nemorl --partition=batch \
   --time=00:30:00 --job-name="$job_name" \

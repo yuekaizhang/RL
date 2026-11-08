@@ -43,13 +43,18 @@ assert scoring_selection["train_step"] == scoring_selection["trainer_version"] =
 assert {tag["weight_version"] for tag in scoring_selection["tags"]} == {600}
 repeat = read("scheduling-repeats.pt")
 serial_kernel = (root / "serial-kernel-controls.json").exists()
+conv_precision = (root / "conv-precision-controls.json").exists()
+assert not (serial_kernel and conv_precision)
 isolation = json.loads((root / "scheduling-isolation.json").read_text())
 assert isolation["max_foreign_requests_during_measurement"] == 0, isolation
-assert set(repeat["scores"]) == (
+expected_modes = (
     {"flashinfer_serial1", "triton_serial1", "flashinfer_restored_serial1"}
     if serial_kernel
     else {"serial1", "microbatch4", "concurrent32"}
 )
+if conv_precision:
+    expected_modes = {"original_serial1", "fp32_conv_serial1", "restored_conv_serial1"}
+assert set(repeat["scores"]) == expected_modes
 assert all(len(runs) == 3 for runs in repeat["scores"].values())
 data = scoring_selection["data"]
 masks, policies = [], []
@@ -265,6 +270,49 @@ if serial_kernel:
         "controls": controls,
     }
     report["scope"] = report["serial_kernel_control"]["scope"]
+if conv_precision:
+    controls = json.loads((root / "conv-precision-controls.json").read_text())
+    assert len(controls["switched"]) == len(controls["restored"]) == 8
+    for switched, restored in zip(
+        controls["switched"], controls["restored"], strict=True
+    ):
+        assert switched["rank"] == restored["rank"]
+        assert switched["gdn_layers"] == 30
+        assert switched["original_source_sha256"] != switched["patched_source_sha256"]
+        assert restored["source_sha256"] == switched["original_source_sha256"]
+        assert restored["restored"] and restored["patched_conv_calls"] > 0
+    for profile in (controls["patched_profile"], controls["restored_profile"]):
+        assert len(profile) == 8
+        assert all(
+            len(item["layers"]) == 30
+            and not item["model_training"]
+            and not item["active_dropout_modules"]
+            and not item["cache_scheduler"]["enable_prefix_caching"]
+            and item["cache_scheduler"]["max_num_batched_tokens"] == 2048
+            and all(
+                layer["prefill_backend"] == "flashinfer"
+                and layer["ssm_cache_dtype"] == "torch.float32"
+                and layer["conv_cache_dtype"] == "torch.bfloat16"
+                and layer["a_log_dtype"] == "torch.float32"
+                for layer in item["layers"]
+            )
+            for item in profile
+        )
+    report["scope"] = (
+        "One actual TP8 engine at checkpoint600, same R9 tokens and policy reference, concurrency1; original3 / explicit-FP32-prefill-conv-product3 / restored3. Only the prefill-conv multiplication precision changes; no weight, GDN-core, decode, cache or training recipe changes."
+    )
+    report["conv_precision_control"] = {
+        "all_within_mode_bitwise_repeatable": all(
+            pair["nonidentical_fraction"] == 0
+            for mode in metrics.values()
+            for pair in mode["repeat_pairs"].values()
+        ),
+        "original_restoration_bitwise_equal": all(
+            pair["nonidentical_fraction"] == 0
+            for pair in cross["original_serial1_vs_restored_conv_serial1"]
+        ),
+        "controls": controls,
+    }
 reference_path = root / "scoring-reference.json"
 if reference_path.exists():
     reference = json.loads(reference_path.read_text())
@@ -295,13 +343,21 @@ if reference_path.exists():
         "reference": reference,
         "initial_refit_hf_tensors_sampled_exact_match": len(expected),
         "scope": "Prefix cache disabled, unchanged2048 chunk budget; prompt-logprob requests already skip cache reads. This changes cache management and GDN alignment, not only prefix reuse.",
-        "matched_serial_kernel_pairs"
-        if serial_kernel
-        else "matched_concurrency_pairs": {
+        (
+            "matched_conv_precision_pairs"
+            if conv_precision
+            else (
+                "matched_serial_kernel_pairs"
+                if serial_kernel
+                else "matched_concurrency_pairs"
+            )
+        ): {
             mode: [
                 compare(
                     repeat["scores"][mode][i],
-                    source_repeats["scores"]["serial1" if serial_kernel else mode][i],
+                    source_repeats["scores"][
+                        "serial1" if serial_kernel or conv_precision else mode
+                    ][i],
                 )
                 for i in range(3)
             ]

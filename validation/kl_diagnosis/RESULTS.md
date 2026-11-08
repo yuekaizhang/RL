@@ -1,5 +1,57 @@
 # AutoModel checkpoint600 固定 token KL 排查
 
+2026-11-08：**已定位一处可复现的局部精度差异：原1030 vLLM prefill 卷积的
+BF16乘积在FP32累加之前先发生舍入。** 对相同checkpoint600权重和677个固定token，
+输入归一化与qkv/z/a/b投影均逐位一致，第一处主要差异出现在卷积+SiLU。
+只给两个乘数显式加FP32 cast后，无激活卷积和SiLU输出均与policy CUDA逐位一致。
+这已由实际GPU、CPU FP64参考、BF16乘积反事实及恢复对照验证；完整模型同token K3下降6.93%，仍有剩余差距。
+
+第一完整GDN组件作业21509317 COMPLETED/exit0，3分20秒；局部精度作业21509601
+COMPLETED/exit0，2分38秒。前者只读16份原checkpoint分片的saved_offsets重建第一层，
+严格检查覆盖、shape和来源，原checkpoint未改。后者只使用已保存的组件输入，不加载
+完整模型或训练。见 [component-summary.json](component-summary.json) 和
+[conv-precision-summary.json](conv-precision-summary.json)。
+
+| 同输入局部对照 | 相对RMS差异 |
+|---|---:|
+| 两端输入norm与四投影 | 0，逐位一致 |
+| 原vLLM conv+SiLU vs policy CUDA | 0.216226% |
+| 原vLLM无激活conv vs CPU BF16乘积反事实（输出舍入BF16） | 0，逐位一致 |
+| 显式FP32乘法cast后，conv及SiLU vs policy CUDA | 0，逐位一致 |
+| TP1完整组件输出 vs policy，修改前→后 | 0.249737% → 0.205107% |
+| TP8-shaped完整组件输出 vs policy，修改前→后 | 0.301397% → 0.265666% |
+
+policy完整组件重复3次、生成各模式重复、恢复原conv后均逐位一致。TP8-shaped在1GPU
+顺序计算分片并本地求和，只是局部控制，不等于真实TP8引擎或NCCL验证。除卷积外，
+共同输入的GDN core和beta精度仍有差异；仅把dt_bias改FP32没有改善组件输出，
+因此不作为生产修复。不能将这些局部误差线性相加或外推为全部gen_kl_error根因。
+
+候选源码补丁：[vllm-1030-prefill-conv-fp32-products.patch](patches/vllm-1030-prefill-conv-fp32-products.patch)。
+该补丁为零上下文diff，使用git时需`git apply --unidiff-zero`，并先核对原1030源码。
+没有修改原镜像或生产训练；诊断用独立JITFunction缓存，只修改prefill乘法，随后恢复。
+**实际EP16/TP8全模型A/B 21509870已COMPLETED/exit0，12分20秒**，仍用原1030、checkpoint600、R9的32序列及
+相同policy参考，固定并发1。原conv3次→仅FP32乘法cast3次→恢复3次，阶段分别预热，
+保持FlashInfer GDN core、cache off、chunk2048、SSM F32、conv BF16和A_log F32。
+8rank RPC记录修改/恢复source hash与真实调用数，resident权重前后抽样保持不变；
+原有train/eval、两次optimizer step的漂移和3次refit验证完整。
+
+| 同引擎/权重/token，相对同一policy参考 | mean K3 |
+|---|---:|
+| 原vLLM卷积，三次一致 | 0.002168075241 |
+| 仅显式FP32乘法cast，三次一致 | 0.002017816874 |
+| 恢复原卷积，逐位回到基线 | 0.002168075241 |
+
+这组固定token的K3下降**6.9305%**；并未解决全部剩余差距。每个rank实际执行4320次
+受控conv调用，resident权重抽样保持不变，3refit每次1026个HF tensor在8rank抽样精确一致，
+两步train/eval均逐位一致。见[full-conv-summary.json](full-conv-summary.json)。原生601/602
+genKL约.00227910/.00206121，LR1e-6/lag0或1/有效32/drop-mask0；它们使用恢复后的原conv，
+不能拿不同训练batch的native值估计patch效果。第一batch advantages/loss/grad_norm均0，
+其optimizer step仍可受已恢复Adam动量和WD影响，不将漂移误解释为非零PG信号。
+
+目前已确认后端计算路径有可修复的精度损失，并量化了一部分完整模型影响；尚未证明
+全部历史AutoModel LA1持续偏高的唯一根因，也未用新长训练验证收敛效果。
+GDN primitive/beta与decoder/MoE/TP计算仍需进一步因果定位。三个本轮作业均已释放。
+
 2026-11-06 09:18 更新：**在同一个引擎、相同权重和token、固定串行条件下，
 仅切换GDN prefill后端，完整模型logprob会稳定改变；但换成Triton没有改善
 与policy之间的差距。** 这把一个可重复的数值影响定位到了prefill路径选择，

@@ -108,6 +108,7 @@ def install():
                 score_one,
                 root,
                 serial_kernel_ab=os.environ.get("SC_LP_SERIAL_KERNEL_AB") == "1",
+                conv_precision_ab=os.environ.get("SC_LP_CONV_AB") == "1",
             )
             return None
 

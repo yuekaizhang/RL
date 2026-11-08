@@ -15,6 +15,8 @@ recovery = len(sys.argv) > 2 and sys.argv[2] == "recovery"
 kwargs_preflight = len(sys.argv) > 2 and sys.argv[2] == "kwargs"
 analysis = len(sys.argv) > 2 and sys.argv[2] == "analysis"
 kernel_replay = len(sys.argv) > 2 and sys.argv[2] == "layer"
+component_replay = len(sys.argv) > 2 and sys.argv[2] == "component"
+conv_replay = len(sys.argv) > 2 and sys.argv[2] == "conv"
 source_job = sys.argv[3] if analysis or kernel_replay else job
 assert job.isdecimal() and source_job.isdecimal()
 while True:
@@ -38,6 +40,10 @@ while True:
         status_kind = "scheduling-analysis"
     if kernel_replay:
         status_kind = "gdn-kernel-replay"
+    if component_replay:
+        status_kind = "gdn-component-replay"
+    if conv_replay:
+        status_kind = "gdn-conv-precision"
     (root / f"results/{status_kind}-status.json").write_text(
         json.dumps(state, indent=2) + "\n"
     )
@@ -144,6 +150,39 @@ while True:
                 "及FP64逐token参考的计算假设；单层结果不能直接等同完整模型KL根因。"
                 "失败主动修复并续验证，先查已有作业防重复。MCore600独立监控，"
                 "900hold及原checkpoint/300stop保持。"
+            )
+        if component_replay:
+            message = (
+                "[已授权的完整GDN组件对照完成/失败通知] 继续原任务，不创建新会话或子agent。项目 "
+                + str(repo)
+                + "。先读 validation/kl_diagnosis/HANDOFF.md 最新附录，查询 sacct -j "
+                + job
+                + "，读取 validation/kl_diagnosis/slurm/gdn-layer-"
+                + job
+                + ".out/.err 与 validation/kl_diagnosis/results/layer-"
+                + job
+                + "/layer-policy.json、layer-analysis.json。本轮只读checkpoint600第一层及R14固定token，"
+                "不是完整模型或训练；核实DCP saved_offsets覆盖、CPU参考、实际policy路径、"
+                "相同输入下投影/卷积/gate/归一化/GDN输出、单变量dt_bias精度与重复性。"
+                "TP8-shaped在单GPU顺序模拟，不等于真实TP8引擎或NCCL验证。"
+                "若失败先核实已有作业防重复，再修必要探针续验证；不得修改原checkpoint、"
+                "释放900hold或重启已完成MCore600，保留两个stop标记。"
+            )
+        if conv_replay:
+            message = (
+                "[已授权的GDN卷积精度对照完成/失败通知] 继续原任务，不创建新会话或子agent。项目 "
+                + str(repo)
+                + "。先读 validation/kl_diagnosis/HANDOFF.md 最新附录，查询 sacct -j "
+                + job
+                + "，读取 validation/kl_diagnosis/slurm/conv-precision-"
+                + job
+                + ".out/.err 与 validation/kl_diagnosis/results/conv-"
+                + job
+                + "/conv-analysis.json、layer-analysis.json。本轮仅使用已保存的21509317组件输入，"
+                "不加载完整模型或训练；核实CPU FP64卷积参考、BF16乘积反事实、实际两端卷积、"
+                "仅JIT诊断实例增加FP32乘法cast前后和恢复重复性、完整组件输出影响。"
+                "局部结果不能等同完整模型KL根因或真实TP8验证。失败先查已有作业再修必要分析；"
+                "不得改原checkpoint或释放900hold，保留MCore两个stop标记。"
             )
         env = dict(os.environ)
         prefix = "/lustre/fsw/portfolios/coreai/users/yuekaiz/tools"
